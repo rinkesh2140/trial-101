@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiteSync — Pitch Deck & User Manual</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; }
+
+  /* NAV */
+  .nav { position: fixed; top: 0; left: 0; right: 0; background: #1D5FA8; color: #fff;
+    display: flex; gap: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
+  .nav a { color: #fff; text-decoration: none; padding: 14px 18px; font-size: 13px;
+    font-weight: 600; opacity: 0.8; transition: opacity 0.2s; border-bottom: 3px solid transparent; }
+  .nav a:hover, .nav a.active { opacity: 1; border-bottom-color: #F97316; }
+  .nav-brand { padding: 14px 20px; font-weight: 800; font-size: 15px; opacity: 1 !important;
+    border-right: 1px solid rgba(255,255,255,0.2); }
+
+  /* SECTIONS */
+  .section { max-width: 860px; margin: 80px auto 0; padding: 40px 24px; }
+  .page-break { page-break-before: always; }
+
+  /* COVER */
+  .cover { background: linear-gradient(135deg, #1D5FA8 0%, #0d3a6b 100%);
+    color: #fff; padding: 80px 24px; text-align: center; margin-top: 48px; }
+  .cover .logo { font-size: 52px; margin-bottom: 16px; }
+  .cover h1 { font-size: 42px; font-weight: 900; letter-spacing: -1px; margin-bottom: 8px; }
+  .cover .tagline { font-size: 18px; opacity: 0.85; margin-bottom: 32px; }
+  .cover .built-by { background: rgba(255,255,255,0.12); border-radius: 12px;
+    display: inline-block; padding: 10px 24px; font-size: 13px; opacity: 0.9; }
+
+  /* CARDS */
+  .card { background: #fff; border-radius: 14px; padding: 28px; margin-bottom: 20px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .card h2 { font-size: 22px; font-weight: 800; color: #1D5FA8; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 2px solid #e8f0fe; }
+  .card h3 { font-size: 16px; font-weight: 700; color: #1a1a2e; margin: 16px 0 8px; }
+  .card p { line-height: 1.7; color: #444; font-size: 14px; }
+
+  /* SECTION TITLE */
+  .sec-title { font-size: 28px; font-weight: 900; color: #1D5FA8; margin: 40px 0 20px;
+    padding-left: 14px; border-left: 5px solid #F97316; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* PROBLEM/SOLUTION */
+  .problem-box { background: #FFF5F5; border: 1.5px solid #FECACA; border-radius: 12px;
+    padding: 20px; }
+  .solution-box { background: #F0FFF4; border: 1.5px solid #BBF7D0; border-radius: 12px;
+    padding: 20px; }
+  .problem-box h3 { color: #DC2626; }
+  .solution-box h3 { color: #16A34A; }
+
+  /* PRICING */
+  .price-card { background: #fff; border-radius: 14px; padding: 24px; text-align: center;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06); border: 2px solid #e8f0fe; transition: border 0.2s; }
+  .price-card.featured { border-color: #1D5FA8; background: linear-gradient(135deg,#EFF6FF,#fff); }
+  .price-card .plan { font-size: 13px; font-weight: 700; color: #666; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 8px; }
+  .price-card .amount { font-size: 36px; font-weight: 900; color: #1D5FA8; }
+  .price-card .period { font-size: 12px; color: #888; margin-bottom: 16px; }
+  .price-card .features { text-align: left; font-size: 13px; color: #555; line-height: 2; }
+  .price-card .badge { background: #F97316; color: #fff; font-size: 11px; font-weight: 700;
+    border-radius: 6px; padding: 2px 8px; margin-bottom: 12px; display: inline-block; }
+
+  /* POC */
+  .poc-card { background: #fff; border-radius: 12px; padding: 18px 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-left: 4px solid #1D5FA8;
+    margin-bottom: 14px; }
+  .poc-card .company { font-size: 16px; font-weight: 800; color: #1D5FA8; margin-bottom: 4px; }
+  .poc-card .role { font-size: 12px; color: #F97316; font-weight: 700; margin-bottom: 8px; }
+  .poc-card .detail { font-size: 13px; color: #555; line-height: 1.8; }
+  .poc-card .why { font-size: 12px; background: #FFF7ED; border-radius: 6px;
+    padding: 6px 10px; margin-top: 8px; color: #92400E; }
+
+  /* USER MANUAL */
+  .step { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .step-num { background: #1D5FA8; color: #fff; width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-weight: 800;
+    font-size: 14px; flex-shrink: 0; }
+  .step-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .step-content p { font-size: 13px; color: #555; line-height: 1.6; }
+
+  .feature-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0; }
+  .feature-row:last-child { border-bottom: none; }
+  .feature-icon { font-size: 22px; flex-shrink: 0; width: 36px; text-align: center; }
+  .feature-text h4 { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+  .feature-text p { font-size: 13px; color: #666; line-height: 1.5; }
+
+  .tag { display: inline-block; background: #EFF6FF; color: #1D5FA8; font-size: 11px;
+    font-weight: 700; border-radius: 6px; padding: 2px 8px; margin: 2px; }
+  .tag.orange { background: #FFF7ED; color: #C2410C; }
+  .tag.green { background: #F0FFF4; color: #15803D; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #1D5FA8; color: #fff; padding: 10px 14px; text-align: left; font-weight: 700; }
+  td { padding: 10px 14px; border-bottom: 1px solid #eee; color: #444; }
+  tr:nth-child(even) td { background: #F8FAFF; }
+
+  /* PRINT */
+  @media print {
+    .nav { display: none; }
+    .section { margin-top: 0; }
+    .cover { margin-top: 0; }
+    .page-break { page-break-before: always; }
+    body { background: #fff; }
+    @page { margin: 1.2cm; }
+  }
+
+  /* HIGHLIGHT */
+  .highlight { background: linear-gradient(135deg, #1D5FA8, #0d3a6b); color: #fff;
+    border-radius: 14px; padding: 28px; margin-bottom: 20px; }
+  .highlight h2 { color: #fff; border-bottom-color: rgba(255,255,255,0.2); }
+  .highlight p, .highlight li { color: rgba(255,255,255,0.9); }
+  ul { padding-left: 18px; }
+  li { margin-bottom: 6px; font-size: 14px; color: #444; line-height: 1.6; }
+  .check li::marker { content: "✓  "; color: #16A34A; font-weight: 700; }
+  .cross li::marker { content: "✕  "; color: #DC2626; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <span class="nav-brand">🏗️ SiteSync</span>
+  <a href="#pitch">Pitch Deck</a>
+  <a href="#pricing">Pricing</a>
+  <a href="#poc">Who to Pitch</a>
+  <a href="#manual">User Manual</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- COVER -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="cover" id="top">
+  <div class="logo">🏗️</div>
+  <h1>SiteSync</h1>
+  <div class="tagline">Complete Site Management for Construction Teams</div>
+  <p style="opacity:0.7;font-size:14px;margin-bottom:24px">Labour · Attendance · Tasks · Communication · HR — All in One App</p>
+  <div class="built-by">Built for Gujarat's Construction Industry · Patel Infrastructure, Surat</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PITCH DECK -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section" id="pitch">
+  <div class="sec-title">01 — The Problem</div>
+
+  <div class="card">
+    <h2>What Every Construction Site Manager Deals With Daily</h2>
+    <div class="grid-2" style="margin-top:8px">
+      <div class="problem-box">
+        <h3>❌ Without SiteSync</h3>
+        <ul class="cross" style="margin-top:10px">
+          <li>Attendance on paper registers — lost, tampered</li>
+          <li>100+ WhatsApp messages daily — no structure</li>
+          <li>No one knows who is on site right now</li>
+          <li>Labour contractor submits fake muster rolls</li>
+          <li>HR doing everything manually — Excel chaos</li>
+          <li>Task assigned on call — no follow-up, no proof</li>
+          <li>No record of mispunch or overtime disputes</li>
+          <li>Emergency contacts scattered in phones</li>
+        </ul>
+      </div>
+      <div class="solution-box">
+        <h3>✅ With SiteSync</h3>
+        <ul class="check" style="margin-top:10px">
+          <li>Digital attendance with IN/OUT timestamps</li>
+          <li>Structured in-app messaging by team</li>
+          <li>Live availability grid — who is On Site / Leave</li>
+          <li>Labour Management with 7-digit Worker IDs</li>
+          <li>HR workflows — requests, approvals, reports</li>
+          <li>Task system with priorities + deadlines</li>
+          <li>Mispunch & extra hours request system</li>
+          <li>Emergency phonebook pinned for all staff</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- MARKET -->
+  <div class="sec-title">02 — Market Opportunity</div>
+  <div class="card">
+    <h2>Gujarat's Construction Boom — Right Time, Right App</h2>
+    <div class="grid-3" style="margin-top:8px">
+      <div style="text-align:center;padding:16px;background:#EFF6FF;border-radius:10px">
+        <div style="font-size:32px;font-weight:900;color:#1D5FA8">13,752</div>
+        <div style="font-size:12px;color:#555;margin-top:4px">Construction firms<br>in Surat alone</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:#FFF7ED;border-radius:10px">
+        <div style="font-size:32px;font-weight:900;color:#F97316">₹50,000 Cr+</div>
+        <div style="font-size:12px;color:#555;margin-top:4px">Surat Smart City +<br>Metro + Road projects</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:#F0FFF4;border-radius:10px">
+        <div style="font-size:32px;font-weight:900;color:#16A34A">314</div>
+        <div style="font-size:12px;color:#555;margin-top:4px">Highway & bridge<br>contractors in Surat</div>
+      </div>
+    </div>
+    <p style="margin-top:16px">The Surat–Mumbai High Speed Rail, Surat Smart City Road Project, and Vadodara Ring Road are all generating hundreds of active sites — each needing exactly what SiteSync provides. <b>No existing app serves this segment in Gujarati construction at this price.</b></p>
+  </div>
+
+  <!-- PRODUCT -->
+  <div class="sec-title page-break">03 — The Product</div>
+  <div class="card">
+    <h2>Two Apps, One Platform</h2>
+
+    <h3>🔨 App 1 — Labour Management System (LMS)</h3>
+    <div class="grid-2" style="margin:12px 0">
+      <div class="feature-row" style="flex-direction:column">
+        <div class="feature-row"><span class="feature-icon">🪪</span><div class="feature-text"><h4>Unique Worker IDs</h4><p>Auto-generated 7-digit IDs, QR-ready for each labour</p></div></div>
+        <div class="feature-row"><span class="feature-icon">👥</span><div class="feature-text"><h4>Companion Workers</h4><p>Multiple workers registered to one mobile number</p></div></div>
+        <div class="feature-row"><span class="feature-icon">📋</span><div class="feature-text"><h4>Attendance Reports</h4><p>Daily IN/OUT logs, export-ready for muster rolls</p></div></div>
+      </div>
+      <div>
+        <div class="feature-row"><span class="feature-icon">⏱️</span><div class="feature-text"><h4>Multi-Punch Support</h4><p>Multiple IN/OUT pairs per day, total hours auto-calculated</p></div></div>
+        <div class="feature-row"><span class="feature-icon">🚫</span><div class="feature-text"><h4>Anti-Fraud Logic</h4><p>No double IN, no OUT without IN — prevents false entries</p></div></div>
+        <div class="feature-row"><span class="feature-icon">📱</span><div class="feature-text"><h4>Mobile First</h4><p>Large buttons for site use — works on basic Android phones</p></div></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:20px">🏢 App 2 — Employee & Supervisor Portal</h3>
+    <div class="grid-2" style="margin:12px 0">
+      <div>
+        <div class="feature-row"><span class="feature-icon">📊</span><div class="feature-text"><h4>Dashboard</h4><p>Attendance hero button, today's stats, pending tasks at a glance</p></div></div>
+        <div class="feature-row"><span class="feature-icon">💬</span><div class="feature-text"><h4>Team Messaging</h4><p>WhatsApp-style DMs + group chats — no personal numbers shared</p></div></div>
+        <div class="feature-row"><span class="feature-icon">✅</span><div class="feature-text"><h4>Task Management</h4><p>Assign tasks with priorities, deadlines, status tracking</p></div></div>
+        <div class="feature-row"><span class="feature-icon">📅</span><div class="feature-text"><h4>Schedule & Availability</h4><p>7/14-day team grid — know who is On Site, WFH, Leave, Field</p></div></div>
+      </div>
+      <div>
+        <div class="feature-row"><span class="feature-icon">👤</span><div class="feature-text"><h4>Employee Directory</h4><p>Full profiles, blood group, address, vehicle — searchable A-Z</p></div></div>
+        <div class="feature-row"><span class="feature-icon">📞</span><div class="feature-text"><h4>External Contacts</h4><p>Emergency, Vendor, Agency, Client phonebook — always accessible</p></div></div>
+        <div class="feature-row"><span class="feature-icon">📝</span><div class="feature-text"><h4>HR Workflows</h4><p>Mispunch requests, extra hours, role management, resign flow</p></div></div>
+        <div class="feature-row"><span class="feature-icon">📈</span><div class="feature-text"><h4>Reports</h4><p>Attendance, availability, labour summary, seniority — print to PDF</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHY US -->
+  <div class="sec-title">04 — Why SiteSync Wins</div>
+  <div class="card highlight">
+    <h2>Our Unfair Advantage</h2>
+    <div class="grid-3" style="margin-top:12px;gap:16px">
+      <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:16px">
+        <div style="font-size:28px;margin-bottom:8px">⚡</div>
+        <h3 style="color:#fff;font-size:14px">Built FOR Construction</h3>
+        <p style="font-size:13px">Not adapted from HR software — designed from day one for site conditions, large touch targets, offline-friendly</p>
+      </div>
+      <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:16px">
+        <div style="font-size:28px;margin-bottom:8px">📦</div>
+        <h3 style="color:#fff;font-size:14px">APK — No Browser Needed</h3>
+        <p style="font-size:13px">Packaged as Android APK. Workers don't need to remember URLs. IT-free deployment on any Android phone</p>
+      </div>
+      <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:16px">
+        <div style="font-size:28px;margin-bottom:8px">💰</div>
+        <h3 style="color:#fff;font-size:14px">10x Cheaper Than Rivals</h3>
+        <p style="font-size:13px">Asite, Procore, FieldEdge cost ₹50,000+/month. SiteSync starts at ₹2,500 — accessible to mid-size contractors</p>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:16px;gap:16px">
+      <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:16px">
+        <div style="font-size:28px;margin-bottom:8px">🌐</div>
+        <h3 style="color:#fff;font-size:14px">Firebase Realtime Sync</h3>
+        <p style="font-size:13px">All data syncs instantly across all devices. PM in office sees what's happening on site in real time</p>
+      </div>
+      <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:16px">
+        <div style="font-size:28px;margin-bottom:8px">🔧</div>
+        <h3 style="color:#fff;font-size:14px">Local Support — Surat</h3>
+        <p style="font-size:13px">Based in Surat. On-site training, Gujarati support, understands local contractors' real workflows</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PRICING -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break" id="pricing">
+  <div class="sec-title">05 — Pricing</div>
+  <div class="card">
+    <h2>Simple, Honest Pricing — Start Free, Grow Paid</h2>
+    <p style="margin-bottom:20px">Perfect for small Surat contractors. Start at zero — upgrade only when you grow.</p>
+    <div class="grid-2">
+      <div class="price-card">
+        <div class="plan">Free Forever</div>
+        <div class="amount" style="color:#16A34A">₹0</div>
+        <div class="period">No credit card · No expiry</div>
+        <div class="features">
+          ✓ Up to <b>10 employees</b><br>
+          ✓ Up to <b>20 labours/day</b> (LMS)<br>
+          ✓ <b>1 site only</b><br>
+          ✓ Attendance + Availability<br>
+          ✓ Messaging & Tasks<br>
+          ✓ Employee Directory<br>
+          ✗ Reports & PDF export<br>
+          ✗ HR workflows (mispunch etc.)<br>
+          ✗ Custom branding
+        </div>
+        <div style="margin-top:14px;background:#F0FFF4;border-radius:8px;padding:10px;font-size:12px;color:#166534">
+          Ideal for: Small PMC teams, 1–2 person site offices, trial before committing
+        </div>
+      </div>
+      <div class="price-card featured">
+        <div class="badge">BEST FOR SURAT CONTRACTORS</div>
+        <div class="plan">Pro — 1 Site</div>
+        <div class="amount">₹3,000</div>
+        <div class="period">/ month &nbsp;|&nbsp; ₹30,000/year (save ₹6,000)</div>
+        <div class="features">
+          ✓ Up to <b>20 employees</b><br>
+          ✓ Up to <b>100 labours/day</b> (LMS)<br>
+          ✓ <b>1 site</b><br>
+          ✓ All Free features +<br>
+          ✓ Full Reports + PDF export<br>
+          ✓ HR workflows (mispunch, extra hours)<br>
+          ✓ Role management<br>
+          ✓ On-site training (half day)<br>
+          ✓ WhatsApp support<br>
+          ✗ Multi-site<br>
+          ✗ Custom branding
+        </div>
+        <div style="margin-top:14px;background:#EFF6FF;border-radius:8px;padding:10px;font-size:12px;color:#1D5FA8">
+          Ideal for: PMCs, small builders, labour agencies handling 50–100 labours on 1 active site
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#FFFBEB;border-radius:10px;padding:16px;margin-top:20px;border:1.5px solid #FDE68A">
+      <h3 style="color:#92400E;margin-bottom:8px">🚀 Your Growth Path</h3>
+      <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;font-size:13px">
+        <div style="background:#F0FFF4;border-radius:8px;padding:10px 14px;text-align:center;min-width:130px">
+          <div style="font-weight:800;color:#16A34A">FREE</div>
+          <div style="color:#555;font-size:12px">Start here<br>10 staff · 20 labour</div>
+        </div>
+        <div style="font-size:20px;padding:0 10px;color:#CCC">→</div>
+        <div style="background:#EFF6FF;border-radius:8px;padding:10px 14px;text-align:center;min-width:130px">
+          <div style="font-weight:800;color:#1D5FA8">₹3,000/mo</div>
+          <div style="color:#555;font-size:12px">Grow to<br>20 staff · 100 labour</div>
+        </div>
+        <div style="font-size:20px;padding:0 10px;color:#CCC">→</div>
+        <div style="background:#FFF7ED;border-radius:8px;padding:10px 14px;text-align:center;min-width:130px">
+          <div style="font-weight:800;color:#F97316">Custom</div>
+          <div style="color:#555;font-size:12px">Big players<br>Multi-site · Enterprise</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px">
+      <h3>Competitor Comparison</h3>
+      <table style="margin-top:10px">
+        <thead><tr><th>Product</th><th>Free Plan</th><th>Paid Price</th><th>APK</th><th>Labour Mgmt</th><th>India-built</th></tr></thead>
+        <tbody>
+          <tr><td><b>SiteSync ⭐</b></td><td>✅ Yes</td><td><b>₹3,000/mo</b></td><td>✅ Yes</td><td>✅ Yes</td><td>✅ Yes</td></tr>
+          <tr><td>Procore</td><td>❌ No</td><td>₹80,000+</td><td>❌ No</td><td>❌ No</td><td>❌ No</td></tr>
+          <tr><td>Asite</td><td>❌ No</td><td>₹60,000+</td><td>❌ No</td><td>❌ No</td><td>Partial</td></tr>
+          <tr><td>Buildbee</td><td>❌ No</td><td>₹15,000+</td><td>❌ No</td><td>❌ No</td><td>Partial</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- WHO TO PITCH + POC -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break" id="poc">
+  <div class="sec-title">06 — Who to Pitch & POC Contacts</div>
+
+  <div class="card">
+    <h2>Your Ideal First Customer — Surat Small Operator</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Who They Are</h3>
+        <ul style="margin-top:8px">
+          <li>PMC (Project Management Consultant) firm — 5–15 staff</li>
+          <li>Small builder / developer — 1–2 active residential sites</li>
+          <li>Labour contractor / agency — manages 50–100 labours for others</li>
+          <li>Civil sub-contractor on larger projects</li>
+          <li>Currently: paper register + WhatsApp groups</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Why They Say YES Fast</h3>
+        <ul style="margin-top:8px">
+          <li><b>Free plan</b> — zero risk, no boss approval needed</li>
+          <li>Owner IS the decision maker — 1 conversation, done</li>
+          <li>Labour fraud is a real daily problem for them</li>
+          <li>No IT team = loves APK (just install and go)</li>
+          <li>Local Surat person = trust factor</li>
+        </ul>
+        <div style="margin-top:12px">
+          <span class="tag green">PMC Firms</span>
+          <span class="tag">Small Builders</span>
+          <span class="tag orange">Labour Agencies</span>
+          <span class="tag">Civil Contractors</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SURAT PMC TARGETS -->
+  <h3 style="font-size:18px;font-weight:800;margin:24px 0 12px;color:#1D5FA8">🏙️ Surat — PMC & Small Builder Targets (Start Here)</h3>
+
+  <div class="poc-card" style="border-left-color:#16A34A">
+    <div class="company">The Rig Veda PMC — Surat</div>
+    <div class="role">PMC | Civil & Interior | 16+ Years | Surat HQ, Active in Surat/Baroda/Ankleshwar</div>
+    <div class="detail">
+      📍 Surat, Gujarat<br>
+      🌐 therigvedapmc.com
+    </div>
+    <div class="why">💡 Perfect first target. Small PMC team, multiple sites across Gujarat — START them on Free plan, convert to ₹3,000/month when they see value. Visit office in person, ask to speak to the owner directly.</div>
+  </div>
+
+  <div class="poc-card" style="border-left-color:#16A34A">
+    <div class="company">SSACT Project Management LLP — Surat</div>
+    <div class="role">PMC | Project Solutions | HQ: Surat | Branch: Ahmedabad</div>
+    <div class="detail">
+      📍 Surat (Head Office), Gujarat<br>
+      🌐 ssact.in
+    </div>
+    <div class="why">💡 Surat HQ = local walk-in possible. Multi-city PMC = they manage labours across sites. Exactly the pain point SiteSync solves. Start free, they'll upgrade fast.</div>
+  </div>
+
+  <div class="poc-card" style="border-left-color:#16A34A">
+    <div class="company">Vinayak CSPL — Surat / Navsari / Ankleshwar</div>
+    <div class="role">PMC | Building + Industrial + Infrastructure | South Gujarat</div>
+    <div class="detail">
+      📍 Surat region, Gujarat<br>
+      🌐 vinayakcspl.com
+    </div>
+    <div class="why">💡 Active in Surat + nearby industrial zones (Ankleshwar, Navsari). PMCs manage labour for clients = critical need for attendance proof. Show them the LMS demo first.</div>
+  </div>
+
+  <div class="poc-card" style="border-left-color:#16A34A">
+    <div class="company">Roongta Developers — Surat</div>
+    <div class="role">Residential Builder | Founded 2011 | Small-Mid Scale</div>
+    <div class="detail">
+      📍 Surat, Gujarat<br>
+      🌐 roongtadevelopers.com
+    </div>
+    <div class="why">💡 Small residential developer — likely 1–2 active sites, 30–60 labours per site. Free plan is zero commitment for them. Pitch the owner directly through the website or visit site office.</div>
+  </div>
+
+  <div class="poc-card" style="border-left-color:#16A34A">
+    <div class="company">SNS Developers — Surat</div>
+    <div class="role">Real Estate Developer | 10M+ sq ft delivered | Growing company</div>
+    <div class="detail">
+      📍 Surat, Gujarat<br>
+      🌐 snsdevelopers.in
+    </div>
+    <div class="why">💡 Growing developer = they feel the management pain as they scale. Good conversion from Free → ₹3,000/month as sites expand. Contact through website or visit ongoing project site.</div>
+  </div>
+
+  <!-- HOW TO APPROACH -->
+  <div class="card" style="margin-top:4px;background:#F8FAFF;border:1.5px solid #DBEAFE">
+    <h2>Your Acquisition Strategy — Phase by Phase</h2>
+    <div class="grid-2">
+      <div>
+        <h3 style="color:#16A34A">Phase 1 — First 10 Clients (Now)</h3>
+        <ul style="margin-top:8px">
+          <li>Target: Surat PMCs + small builders + labour agencies</li>
+          <li>Offer: <b>100% Free plan</b> — just install and use</li>
+          <li>Goal: Get 10 real users giving feedback</li>
+          <li>Method: Personal visit + WhatsApp message + APK demo on spot</li>
+          <li>Time: 2–3 months to acquire first 10</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:#1D5FA8">Phase 2 — Paid Conversion (Month 3–6)</h3>
+        <ul style="margin-top:8px">
+          <li>Convert active Free users to ₹3,000/month Pro</li>
+          <li>Show them: reports, PDF export, HR features they're missing</li>
+          <li>10 paid clients = ₹30,000/month recurring</li>
+          <li>Ask each for 1 referral to their contractor friends</li>
+          <li>Then approach Avadh Group, Sangini Group — bigger players</li>
+        </ul>
+      </div>
+    </div>
+    <div style="background:#FFF7ED;border-radius:8px;padding:12px;margin-top:14px;border-left:4px solid #F97316">
+      <b style="color:#C2410C">Key insight:</b> <span style="font-size:13px;color:#555">Labour contractors in Surat often work for multiple builders. If one labour agency uses SiteSync, they'll recommend it to the 3–4 builders they work for. <b>One agency = 4 leads.</b> Start with labour agencies first.</span>
+    </div>
+  </div>
+
+  <!-- HOW TO PITCH -->
+  <div class="card" style="margin-top:24px">
+    <h2>Your Pitch Script — PMC / Small Contractor Version</h2>
+    <div style="background:#F8FAFF;border-radius:10px;padding:18px;border-left:4px solid #1D5FA8;font-size:14px;line-height:1.9;font-style:italic;color:#333">
+      "Namaste bhai, main Rinkesh hun — Surat se. Maine ek app banaya hai chhote contractors ke liye. Site pe 50-100 labour hain? Register pe attendance likhte ho? Main ek app dikhata hun — bilkul free hai. Koi paisa nahi. Labour ka attendance, employee ka schedule, WhatsApp jaisi messaging — sab ek jagah. FREE mein 10 employee aur 20 labour roz manage kar sako. Jab badho tab hi ₹3,000/month. Abhi kuch nahi. 10 minute mein install karke dikhata hun."
+    </div>
+    <p style="margin-top:12px;font-size:13px;color:#666"><b>3 magic words:</b> <b style="color:#16A34A">"bilkul free hai"</b> — opens door instantly. <b style="color:#1D5FA8">"labour fraud band"</b> — hooks every PMC. <b style="color:#F97316">"WhatsApp chhodo"</b> — everyone relates.</p>
+    <div style="margin-top:12px;background:#F0FFF4;border-radius:8px;padding:12px;font-size:13px;color:#166534">
+      <b>Where to find targets in Surat:</b> Katargam GIDC offices · Sachin GIDC site offices · Adajan/Vesu builder offices · Active construction sites on Dumas Road, Pal, Althan · SMC (Surat Municipal Corporation) tender notice boards.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- USER MANUAL -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break" id="manual">
+  <div class="sec-title">07 — User Manual</div>
+
+  <!-- GETTING STARTED -->
+  <div class="card">
+    <h2>Getting Started — First Time Setup</h2>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Install the APK</h4>
+        <p>Download and install the SiteSync APK on your Android phone. No Play Store needed — direct install. Allow "Unknown Sources" in Settings → Security if prompted.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Login with your credentials</h4>
+        <p>Enter your username and password provided by your Project Manager or HR. First-time users should change their password from the Profile section.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>Mark your attendance</h4>
+        <p>From the Home (Dashboard) tab, tap the large <b>Mark IN</b> button when you arrive at site. Tap <b>Mark OUT</b> when leaving. Your attendance is saved instantly.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h4>Set your availability</h4>
+        <p>Go to More → Schedule → Plan tab. Tap on any day card to set your status: On Site / WFH / Leave / Field / Off / Half Day. Your team can see this in real time.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="card">
+    <h2>The 5 Tabs — Quick Reference</h2>
+    <table>
+      <thead><tr><th>Tab</th><th>Icon</th><th>What it does</th><th>Who uses it most</th></tr></thead>
+      <tbody>
+        <tr><td><b>Work</b></td><td>✅</td><td>View and manage tasks assigned to you or your team. Filter by status. Create new tasks (PM/SM/SE only).</td><td>All staff</td></tr>
+        <tr><td><b>Crew</b></td><td>👷</td><td>Internal employee directory (search, call, message). External contacts — Emergency, Vendors, Agencies, Clients.</td><td>All staff</td></tr>
+        <tr><td><b>Home</b></td><td>🏠</td><td>Dashboard — attendance button, today's stats, pending tasks, quick links. Main screen after login.</td><td>All staff</td></tr>
+        <tr><td><b>Chat</b></td><td>💬</td><td>WhatsApp-style messaging. DM any colleague or chat in group channels. No personal numbers shared.</td><td>All staff</td></tr>
+        <tr><td><b>More</b></td><td>☰</td><td>Schedule, My Pad, Reports, My Profile. Company info, site details, HR policy.</td><td>All staff</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ROLES -->
+  <div class="card">
+    <h2>User Roles & Permissions</h2>
+    <table>
+      <thead><tr><th>Role</th><th>Code</th><th>Can Do</th></tr></thead>
+      <tbody>
+        <tr><td><b>Project Manager</b></td><td><span class="tag">PM</span></td><td>Full access — add/edit/delete employees, change roles, approve requests, view all reports</td></tr>
+        <tr><td><b>Site Manager</b></td><td><span class="tag">SM</span></td><td>Almost full — manage employees, approve requests, view reports (cannot delete employees)</td></tr>
+        <tr><td><b>HR Manager</b></td><td><span class="tag">HR</span></td><td>HR workflows — approve mispunch/extra hours, view reports, manage employee info, resign employees</td></tr>
+        <tr><td><b>Senior Engineer</b></td><td><span class="tag">SE</span></td><td>Create & manage tasks, view team, messaging</td></tr>
+        <tr><td><b>Engineer</b></td><td><span class="tag">EN</span></td><td>View tasks assigned to them, messaging, attendance, availability</td></tr>
+        <tr><td><b>Supervisor</b></td><td><span class="tag">SV</span></td><td>Labour management (LMS), attendance marking, messaging</td></tr>
+        <tr><td><b>Junior Eng / Asst / Teknik</b></td><td><span class="tag">JE/AS/TK</span></td><td>Basic — own attendance, messaging, view tasks, availability</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ATTENDANCE -->
+  <div class="card">
+    <h2>Attendance — How It Works</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Employee Attendance</h3>
+        <ul style="margin-top:8px">
+          <li>Tap <b>Mark IN</b> on Home dashboard when arriving</li>
+          <li>Tap <b>Mark OUT</b> when leaving — time is recorded</li>
+          <li>Multiple IN/OUT pairs allowed (if you leave and return)</li>
+          <li>Cannot mark IN twice without marking OUT first</li>
+          <li>View your history: More → Schedule → History</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Mispunch / Correction</h3>
+        <ul style="margin-top:8px">
+          <li>Forgot to mark IN or OUT? Submit a Mispunch Request</li>
+          <li>Go to More → Schedule → Requests → + New Request</li>
+          <li>Select date, provide correct times + reason</li>
+          <li>PM / SM / HR will approve or reject</li>
+          <li>Approved requests auto-apply to your record</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- LABOUR -->
+  <div class="card">
+    <h2>Labour Management System (LMS) — For Supervisors</h2>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Enroll a New Labour</h4>
+        <p>Open LMS app → tap <b>Enroll Worker</b> → enter name + mobile number. A unique 7-digit Worker ID is auto-generated. Multiple workers can share one mobile number (companions).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Mark Labour Attendance</h4>
+        <p>Search worker by ID or name → tap <b>Mark IN</b>. At end of day, tap <b>Mark OUT</b>. System prevents double IN or OUT without IN.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>Generate Reports</h4>
+        <p>View daily / weekly attendance reports. Export to verify against contractor's muster roll. Prevents fake attendance fraud.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="card">
+    <h2>Reports — PM / SM / HR Only</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Available Reports</h3>
+        <ul style="margin-top:8px">
+          <li><b>Attendance Report</b> — daily/monthly present/absent per employee</li>
+          <li><b>Availability Report</b> — who was On Site vs WFH vs Leave</li>
+          <li><b>Labour Summary</b> — total labour hours per day</li>
+          <li><b>Seniority Report</b> — experience ranking of all staff</li>
+          <li><b>Scanner Log</b> — who scanned labour IN/OUT</li>
+        </ul>
+      </div>
+      <div>
+        <h3>How to Print / Save PDF</h3>
+        <ol style="margin-top:8px;padding-left:18px">
+          <li style="margin-bottom:6px">Go to <b>More → Reports</b></li>
+          <li style="margin-bottom:6px">Select report type and date range</li>
+          <li style="margin-bottom:6px">Tap <b>Generate</b></li>
+          <li style="margin-bottom:6px">Tap <b>🖨️ Print / Save PDF</b></li>
+          <li>Use Chrome's Share → Print or Save as PDF</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="card">
+    <h2>Common Questions</h2>
+    <table>
+      <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+      <tbody>
+        <tr><td>My attendance didn't save</td><td>Check your internet connection. The app needs internet to sync. If offline, mark again when connected.</td></tr>
+        <tr><td>I can't see my colleague in Crew</td><td>Only active (non-resigned) employees appear. Ask HR to check their profile status.</td></tr>
+        <tr><td>My messages are not sending</td><td>Internet connection needed for messaging. Check connectivity.</td></tr>
+        <tr><td>I forgot my password</td><td>Contact your HR Manager or Project Manager — they can reset it.</td></tr>
+        <tr><td>Can I use it on iPhone?</td><td>Currently Android only (APK). Web version works on any browser at the provided URL.</td></tr>
+        <tr><td>Is my data safe?</td><td>Yes — data stored in Google Firebase with secure access rules. Only your company's employees can access your data.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CONTACT -->
+  <div class="card highlight" style="text-align:center">
+    <h2 style="color:#fff;border-bottom-color:rgba(255,255,255,0.2);text-align:center">Get Started Today</h2>
+    <p style="font-size:16px;margin:16px 0">Ready to demo? 3 months free for first 10 clients.</p>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">Rinkesh Patel</div>
+    <div style="font-size:14px;opacity:0.85">SiteSync · Surat, Gujarat</div>
+    <div style="margin-top:16px;font-size:14px;opacity:0.8">
+      Built on Firebase · Android APK · No IT setup required
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:30px;color:#999;font-size:12px">
+  SiteSync © 2026 · Patel Infrastructure Site Management Suite · Surat, Gujarat
+</div>
+
+</body>
+</html>

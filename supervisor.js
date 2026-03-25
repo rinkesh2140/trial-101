@@ -1497,7 +1497,7 @@ function openEmpProfile(empId) {
     ${e.id !== sess.employeeId ? `
     <div class="btn-row" style="margin-bottom:14px">
       <button class="btn btn-primary" style="margin:0;flex:1" onclick="closeModal('modal-emp-profile');openWAChat('${e.id}')">💬 Message</button>
-      ${e.mobile ? `<a href="tel:${e.mobile}" style="flex:1;text-decoration:none"><button class="btn btn-green" style="margin:0;width:100%">📞 Call</button></a>` : ''}
+      ${e.mobile ? `<button class="btn btn-green" style="margin:0;flex:1" onclick="window.location.href='tel:${e.mobile}'">📞 Call</button>` : ''}
     </div>` : ''}
     <div style="font-size:13px;margin-bottom:6px"><b>📱 Mobile:</b> ${e.mobile||'—'}</div>
     <div style="font-size:13px;margin-bottom:6px"><b>🔑 Login:</b> ${e.username}</div>
