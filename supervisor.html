@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1D5FA8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Supervisor Portal — Patel Infrastructure</title>
+<link rel="stylesheet" href="supervisor.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="fb-loading" style="position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1a3c5e 0%,#2980b9 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999">
+  <div style="font-size:52px;margin-bottom:14px">🏗️</div>
+  <div style="color:#fff;font-size:20px;font-weight:bold;margin-bottom:6px">Patel Infrastructure</div>
+  <div style="color:#aad4f5;font-size:14px;margin-bottom:28px">Loading project data...</div>
+  <div style="width:44px;height:44px;border:4px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:fbspin 0.8s linear infinite"></div>
+</div>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="login-screen">
+  <div class="login-logo">🏗️</div>
+  <div class="login-title">Patel Infrastructure Pvt. Ltd.</div>
+  <div class="login-sub">Supervisor & Staff Portal</div>
+  <div class="login-card">
+    <h3>Sign In</h3>
+    <label for="l-user">Username</label>
+    <input type="text" id="l-user" placeholder="Enter username" autocomplete="off">
+    <label for="l-pass">Password</label>
+    <input type="password" id="l-pass" placeholder="Enter password"
+           onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="btn btn-primary" onclick="doLogin()">Login →</button>
+    <div id="login-error"></div>
+  </div>
+  <div class="login-footer">Surat Smart City Road Project</div>
+</div>
+
+<!-- ══════════ APP SHELL ══════════ -->
+<div id="app-shell" hidden>
+
+  <!-- Full header — dashboard only -->
+  <div id="app-header">
+    <div class="hdr-left">
+      <div class="company">🏗️ Patel Infrastructure</div>
+      <div class="project">Surat Smart City Road Project</div>
+    </div>
+    <div class="hdr-right">
+      <div class="user-avatar" id="hdr-avatar" onclick="showTab('profile')" style="cursor:pointer">—</div>
+      <div id="hdr-user-info">
+        <div class="hdr-name" id="hdr-name">—</div>
+        <div class="hdr-role" id="hdr-role">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slim header — all tabs except dashboard -->
+  <div id="slim-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🏗️</span>
+      <span id="slim-header-title" style="font-size:15px;font-weight:700;color:var(--text)"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px">
+      <button id="slim-extra-btn" style="display:none;background:none;border:none;font-size:20px;cursor:pointer;padding:6px;color:var(--brand);line-height:1"></button>
+      <div class="user-avatar" id="slim-avatar" onclick="showTab('profile')" style="cursor:pointer;background:var(--brand);color:#fff;border:none;box-shadow:none;width:32px;height:32px;font-size:11px">—</div>
+    </div>
+  </div>
+
+  <nav id="main-nav"></nav>
+
+  <div id="toast"></div>
+
+  <!-- ① DASHBOARD ── -->
+  <section id="sec-dashboard">
+    <div id="dash-content"></div>
+  </section>
+
+  <!-- ② MY PAD ── -->
+  <section id="sec-mypad">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <h2 style="margin:0">My Pad <span style="font-size:11px;color:#aaa;font-weight:normal">— only on this device</span></h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-sm btn-primary" onclick="openPadItem('task')">＋ To-Do</button>
+        <button class="btn-sm btn-accent"  onclick="openPadItem('note')">＋ Note</button>
+        <button class="btn-sm btn-orange"  onclick="openPadItem('call')">＋ Call</button>
+        <button class="btn-sm" style="background:#8e44ad;color:#fff" onclick="openPadItem('voice')">🎙 Voice</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="pad-filter-row">
+      <button class="cat-btn active" onclick="setPadFilter('all',this)">All</button>
+      <button class="cat-btn" onclick="setPadFilter('task',this)">To-Do</button>
+      <button class="cat-btn" onclick="setPadFilter('note',this)">Notes</button>
+      <button class="cat-btn" onclick="setPadFilter('call',this)">Calls</button>
+      <button class="cat-btn" onclick="setPadFilter('voice',this)">Voice</button>
+    </div>
+    <div id="pad-list"></div>
+  </section>
+
+  <!-- ③ SCHEDULE — Attendance History + Availability ── -->
+  <section id="sec-schedule">
+    <!-- Schedule subtabs -->
+    <div class="crew-tabs" style="margin-bottom:14px">
+      <button class="crew-tab active" id="sched-tab-plan"     onclick="switchSchedTab('plan')">My Plan</button>
+      <button class="crew-tab"        id="sched-tab-team"     onclick="switchSchedTab('team')">Team</button>
+      <button class="crew-tab"        id="sched-tab-history"  onclick="switchSchedTab('history')">History</button>
+      <button class="crew-tab"        id="sched-tab-requests" onclick="switchSchedTab('requests')">Requests</button>
+    </div>
+    <!-- My Plan pane -->
+    <div id="sched-plan-pane">
+      <div id="planner-personal"></div>
+    </div>
+    <!-- Team pane -->
+    <div id="sched-team-pane" style="display:none">
+      <div id="planner-team"></div>
+    </div>
+    <!-- History pane -->
+    <div id="sched-history-pane" style="display:none">
+      <div id="attend-today" style="margin-bottom:10px"></div>
+      <div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Last 14 Days</div>
+      <div id="attend-history"></div>
+    </div>
+    <!-- Requests pane -->
+    <div id="sched-requests-pane" style="display:none">
+      <div id="punch-req-list"></div>
+    </div>
+  </section>
+
+  <!-- ④ CREW — Internal + External tabs ── -->
+  <section id="sec-people">
+    <!-- Tab row -->
+    <div class="crew-tabs">
+      <button class="crew-tab active" id="crew-tab-internal" onclick="switchCrewTab('internal')">Internal</button>
+      <button class="crew-tab"        id="crew-tab-external" onclick="switchCrewTab('external')">External</button>
+    </div>
+
+    <!-- Search + Add row -->
+    <div class="crew-search-row">
+      <div class="search-wrap">
+        <input type="text" id="people-search" placeholder="Search…" oninput="contactSearch=this.value;renderPeople();renderContactsList();document.getElementById('crew-search-clear').style.display=this.value?'flex':'none'">
+        <button id="crew-search-clear" class="search-clear" style="display:none" onclick="document.getElementById('people-search').value='';contactSearch='';renderPeople();renderContactsList();this.style.display='none'">✕</button>
+      </div>
+      <div id="crew-add-btn"></div>
+    </div>
+
+    <!-- Internal pane -->
+    <div id="crew-internal-pane">
+      <div id="people-hier"></div>
+    </div>
+
+    <!-- External pane -->
+    <div id="crew-external-pane" style="display:none">
+      <div class="cat-filter-row" id="cat-filter-row">
+        <button class="cat-btn active" onclick="filterContacts('all',this)">All</button>
+        <button class="cat-btn" onclick="filterContacts('emergency',this)">🚨 Emergency</button>
+        <button class="cat-btn" onclick="filterContacts('agency',this)">🏢 Agency</button>
+        <button class="cat-btn" onclick="filterContacts('vendor',this)">🛒 Vendor</button>
+        <button class="cat-btn" onclick="filterContacts('client',this)">🤝 Client</button>
+        <button class="cat-btn" onclick="filterContacts('other',this)">📋 Other</button>
+      </div>
+      <div id="contacts-list"></div>
+    </div>
+  </section>
+
+  <!-- ⑤ MESSAGES (WhatsApp) ── -->
+  <section id="sec-messages">
+    <div id="wa-wrap">
+      <div id="wa-list-view">
+        <div class="wa-search"><div class="search-wrap"><input id="wa-search-inp" placeholder="Search conversations…" oninput="renderConvList();document.getElementById('wa-search-clear').style.display=this.value?'flex':'none'"><button id="wa-search-clear" class="search-clear" style="display:none" onclick="document.getElementById('wa-search-inp').value='';renderConvList();this.style.display='none'">✕</button></div></div>
+        <div id="wa-conv-list"></div>
+      </div>
+      <div id="wa-chat-view" style="display:none">
+        <div class="wa-chat-header" id="wa-chat-hdr"></div>
+        <div id="wa-chat-msgs"></div>
+        <div class="wa-input-bar">
+          <input id="wa-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')waSend()">
+          <button class="wa-send-btn" onclick="waSend()">&#10148;</button>
+        </div>
+      </div>
+      <div id="wa-new-view" style="display:none">
+        <div class="wa-chat-header">
+          <button class="wa-back-btn" onclick="showWAView('list')">‹</button>
+          <div class="wa-chat-hdr-info"><div class="wa-chat-hdr-name">New Message</div></div>
+          <button class="wa-create-grp-btn" onclick="openCreateGroup()" title="Create Group">👥</button>
+        </div>
+        <div class="wa-search"><input placeholder="Search employee…" oninput="filterNewList(this.value)"></div>
+        <div id="wa-new-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑥ WORK — Tasks ── -->
+  <section id="sec-work">
+    <div id="task-controls" style="margin-bottom:12px"></div>
+    <div id="task-list"></div>
+  </section>
+
+  <!-- ⑥·⁵ MORE HUB ── -->
+  <section id="sec-more"></section>
+
+  <!-- ⑦ REPORTS ── -->
+  <section id="sec-reports">
+    <h2>Reports</h2>
+    <div class="rtype-row" id="rtype-row-dynamic"></div>
+    <div id="sup-report-controls"></div>
+    <div style="margin-bottom:12px">
+      <div class="labour-banner" style="margin-bottom:10px">
+        <div class="lb-title" style="font-size:15px">👷 Labour Management System</div>
+        <div class="lb-sub">Enroll workers, mark attendance & generate labour reports</div>
+        <a href="index.html" target="_blank" style="text-decoration:none">
+          <button class="btn btn-green" style="margin:0;font-size:15px">Open Labour System →</button>
+        </a>
+      </div>
+    </div>
+    <button class="btn btn-accent" style="margin-bottom:12px" onclick="printSupReport()">🖨 Print / PDF</button>
+    <div id="sup-report-output"></div>
+  </section>
+
+  <!-- ⑧ PROFILE ── -->
+  <section id="sec-profile">
+    <div id="profile-content"></div>
+  </section>
+
+</div><!-- end app-shell -->
+
+<!-- ══════════ MODALS ══════════ -->
+<div id="modal-emp-profile" class="modal-overlay" onclick="overlayClose(event,'modal-emp-profile')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="mp-title">Employee Profile</span>
+      <button class="modal-close" onclick="closeModal('modal-emp-profile')">✕</button>
+    </div>
+    <div id="mp-content"></div>
+  </div>
+</div>
+
+<div id="modal-add-emp" class="modal-overlay" onclick="overlayClose(event,'modal-add-emp')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Add Employee</span>
+      <button class="modal-close" onclick="closeModal('modal-add-emp')">✕</button>
+    </div>
+    <label>Full Name</label>
+    <input type="text" id="ae-name" placeholder="Employee full name">
+    <label>Role</label>
+    <select id="ae-role">
+      <option value="PM">Project Manager</option>
+      <option value="SM">Site Manager</option>
+      <option value="HR">HR Manager</option>
+      <option value="SE">Senior Site Engineer</option>
+      <option value="EN" selected>Site Engineer</option>
+      <option value="SV">Supervisor / Foreman</option>
+      <option value="JE">Junior Engineer</option>
+      <option value="AS">Assistant Supervisor</option>
+      <option value="TK">Timekeeper</option>
+    </select>
+    <label>Department</label>
+    <input type="text" id="ae-dept" placeholder="e.g. Civil, MEP, QA, Admin">
+    <label>Mobile</label>
+    <input type="tel" id="ae-mobile" placeholder="10-digit mobile" maxlength="10">
+    <label>Joining Date</label>
+    <input type="date" id="ae-joindate">
+    <label>Username (for login)</label>
+    <input type="text" id="ae-user" placeholder="e.g. firstname.lastname">
+    <label>Password</label>
+    <input type="password" id="ae-pass" placeholder="Login password">
+    <button class="btn btn-primary" onclick="addEmployee()">Add Employee</button>
+  </div>
+</div>
+
+<div id="modal-create-task" class="modal-overlay" onclick="overlayClose(event,'modal-create-task')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Create Task</span>
+      <button class="modal-close" onclick="closeModal('modal-create-task')">✕</button>
+    </div>
+    <label>Task Title</label>
+    <input type="text" id="ct-title" placeholder="Short task description">
+    <label>Details (optional)</label>
+    <textarea id="ct-desc" placeholder="More details..."></textarea>
+    <label>Assign To</label>
+    <select id="ct-assign"></select>
+    <label>Priority</label>
+    <select id="ct-priority">
+      <option value="high">🔴 High</option>
+      <option value="medium" selected>🟡 Medium</option>
+      <option value="low">🟢 Low</option>
+    </select>
+    <label>Due Date</label>
+    <input type="date" id="ct-due">
+    <button class="btn btn-primary" onclick="createTask()">Create Task</button>
+  </div>
+</div>
+
+<div id="modal-task-detail" class="modal-overlay" onclick="overlayClose(event,'modal-task-detail')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Task Detail</span>
+      <button class="modal-close" onclick="closeModal('modal-task-detail')">✕</button>
+    </div>
+    <div id="td-content"></div>
+  </div>
+</div>
+
+<!-- ── PAD ITEM ── -->
+<div id="modal-pad-item" class="modal-overlay" onclick="overlayClose(event,'modal-pad-item')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="pad-modal-title">Add Item</span>
+      <button class="modal-close" onclick="closeModal('modal-pad-item')">✕</button>
+    </div>
+    <div id="pad-modal-body"></div>
+  </div>
+</div>
+
+<!-- ── CREATE GROUP ── -->
+<div id="modal-create-group" class="modal-overlay" onclick="overlayClose(event,'modal-create-group')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">New Group</span>
+      <button class="modal-close" onclick="closeModal('modal-create-group')">✕</button>
+    </div>
+    <label>Group Name</label>
+    <input type="text" id="grp-name" placeholder="e.g. Civil Team, Site Ops">
+    <label>Add Members</label>
+    <div id="grp-member-list" style="max-height:240px;overflow-y:auto;border:2px solid #d5e8f7;border-radius:8px;padding:8px;margin-bottom:12px"></div>
+    <button class="btn btn-primary" onclick="createGroup()">Create Group</button>
+  </div>
+</div>
+
+<!-- ── ADD CONTACT ── -->
+<div id="modal-add-contact" class="modal-overlay" onclick="overlayClose(event,'modal-add-contact')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="ac-modal-title">Add Contact</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="ac-options-btn" class="modal-close" style="display:none;font-size:20px;font-weight:700" onclick="toggleContactOptions()">⋯</button>
+        <button class="modal-close" onclick="closeModal('modal-add-contact')">✕</button>
+      </div>
+    </div>
+    <div id="ac-options-panel" style="display:none;background:#FEF2F2;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;border:1px solid #FECACA">
+      <button id="ac-del-btn" class="btn" style="background:var(--danger);color:#fff;margin:0" onclick="">🗑 Delete this Contact</button>
+    </div>
+    <input type="hidden" id="ac-edit-id">
+    <button id="ac-call-btn" class="btn btn-green" style="display:none;margin-bottom:18px">📞 Call</button>
+    <label>Name / Organisation</label>
+    <input type="text" id="ac-name" placeholder="e.g. Fire Station Surat South">
+    <label>Category</label>
+    <select id="ac-cat">
+      <option value="emergency">🚨 Emergency</option>
+      <option value="agency">🏢 Agency / Subcontractor</option>
+      <option value="vendor">🛒 Material Vendor</option>
+      <option value="client">🤝 Client / Consultant</option>
+      <option value="office">🏬 Office / Admin</option>
+      <option value="other">📋 Other</option>
+    </select>
+    <label>Phone Number</label>
+    <input type="tel" id="ac-phone" placeholder="e.g. 9876500000">
+    <label>Description (optional)</label>
+    <input type="text" id="ac-desc" placeholder="e.g. Nearest fire station to site">
+    <button id="ac-save-btn" class="btn btn-primary" onclick="saveContact()">Save Contact</button>
+    <div class="btn-row" style="margin-top:4px">
+      <button id="ac-edit-mode-btn" class="btn btn-accent" style="display:none;margin:0">✏️ Edit Contact</button>
+      <button id="ac-del-view-btn"  class="btn btn-red"    style="display:none;margin:0">🗑 Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PUNCH REQUEST — Submit ── -->
+<div id="modal-punch-req" class="modal-overlay" onclick="overlayClose(event,'modal-punch-req')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">🕐 Submit Punch Request</span>
+      <button class="modal-close" onclick="closeModal('modal-punch-req')">✕</button>
+    </div>
+    <label>Request Type</label>
+    <select id="pr-type">
+      <option value="mispunch">Mispunch Correction (forgot to punch)</option>
+      <option value="extra-hours">Extra Hours (overtime not recorded)</option>
+    </select>
+    <label>Date</label>
+    <input type="date" id="pr-date">
+    <label>IN Time</label>
+    <input type="time" id="pr-intime">
+    <label>OUT Time (optional)</label>
+    <input type="time" id="pr-outtime">
+    <label>Reason</label>
+    <textarea id="pr-reason" placeholder="Briefly explain why this correction is needed…" style="min-height:70px"></textarea>
+    <button class="btn btn-primary" onclick="submitPunchRequest()">Submit Request</button>
+  </div>
+</div>
+
+<!-- ── PUNCH REQUEST — Manager Review ── -->
+<div id="modal-review-req" class="modal-overlay" onclick="overlayClose(event,'modal-review-req')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Review Punch Request</span>
+      <button class="modal-close" onclick="closeModal('modal-review-req')">✕</button>
+    </div>
+    <div id="rr-content"></div>
+    <label>Decision Note (optional)</label>
+    <textarea id="rr-note" placeholder="Add a note for the employee…" style="min-height:56px"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="decideRequest('approved')">✓ Approve</button>
+      <button class="btn btn-red"   onclick="decideRequest('rejected')">✗ Reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT MY PROFILE ── -->
+<div id="modal-edit-profile" class="modal-overlay" onclick="overlayClose(event,'modal-edit-profile')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Edit My Profile</span>
+      <button class="modal-close" onclick="closeModal('modal-edit-profile')">✕</button>
+    </div>
+    <label>Blood Group</label>
+    <select id="ep-blood">
+      <option value="">— Select —</option>
+      <option value="A+">A+</option><option value="A-">A-</option>
+      <option value="B+">B+</option><option value="B-">B-</option>
+      <option value="AB+">AB+</option><option value="AB-">AB-</option>
+      <option value="O+">O+</option><option value="O-">O-</option>
+    </select>
+    <label>Date of Birth</label>
+    <input type="date" id="ep-dob">
+    <label>Address</label>
+    <textarea id="ep-address" placeholder="Street, Area, City" style="min-height:64px"></textarea>
+    <label>Pincode</label>
+    <input type="text" id="ep-pincode" placeholder="6-digit pincode" maxlength="6" inputmode="numeric">
+    <label>Vehicle No.</label>
+    <input type="text" id="ep-vehicle" placeholder="e.g. GJ05AB1234" style="text-transform:uppercase">
+    <label>Prior Experience (years)</label>
+    <input type="number" id="ep-prior-exp" placeholder="e.g. 3.5 for 3 yrs 6 months" min="0" max="40" step="0.5">
+    <div style="font-size:11px;color:var(--text-3);margin-top:-10px;margin-bottom:14px">Total work experience before joining Patel Infrastructure</div>
+    <button class="btn btn-primary" onclick="saveProfileEdit()">Save Changes</button>
+  </div>
+</div>
+
+<div id="print-area"></div>
+<script src="supervisor.js"></script>
+</body>
+</html>

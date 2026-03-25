@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:69c1efee52248af3a45ad77c--trialrp101.netlify.app)",
+      "Read(//d/f/RINKESH_CLAUDE/**)",
+      "Bash(firebase deploy:*)",
+      "Bash(cmd.exe /c \"cd /d f:\\\\RINKESH_CLAUDE\\\\deploy && firebase deploy --only hosting\")",
+      "Bash(cmd.exe /c \"f: && cd f:\\\\RINKESH_CLAUDE\\\\deploy && firebase deploy --only hosting\")",
+      "Bash(cmd.exe /c \"f: && cd f:\\\\RINKESH_CLAUDE\\\\deploy && dir\")",
+      "Bash(cmd.exe /c \"pushd f:\\\\RINKESH_CLAUDE\\\\deploy && firebase deploy --only hosting && popd\")",
+      "Bash(cmd.exe /c \"f:\\\\RINKESH_CLAUDE\\\\deploy.bat\")",
+      "Bash(cmd.exe /c \"where firebase\")",
+      "Bash(cmd.exe /c \"echo test\")",
+      "Bash(cmd.exe /c \"echo test > C:\\\\Users\\\\DELL\\\\tmp_out.txt 2>&1\")",
+      "Read(//c/Users/DELL/**)",
+      "Bash(python3 -:*)",
+      "Bash(ls -la f:/RINKESH_CLAUDE/deploy/supervisor*)",
+      "Bash(ls -la f:/RINKESH_CLAUDE/supervisor*)",
+      "Bash(cmd.exe /c \"copy /Y f:\\\\RINKESH_CLAUDE\\\\supervisor.js f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.js && copy /Y f:\\\\RINKESH_CLAUDE\\\\supervisor.html f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.html && echo DONE\")",
+      "Bash(cmd.exe /c \"copy /Y \"\"f:\\\\RINKESH_CLAUDE\\\\supervisor.js\"\" \"\"f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.js\"\" 2>&1 && copy /Y \"\"f:\\\\RINKESH_CLAUDE\\\\supervisor.html\"\" \"\"f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.html\"\" 2>&1\")",
+      "Bash(powershell -Command \"Copy-Item ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' ''f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.js'' -Force; Copy-Item ''f:\\\\RINKESH_CLAUDE\\\\supervisor.html'' ''f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.html'' -Force; Write-Host ''Copied''\")",
+      "Bash(powershell -Command \"Copy-Item ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' ''f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.js'' -Force; Write-Host ''Copied''\")",
+      "Bash(powershell -Command \"Copy-Item ''f:\\\\RINKESH_CLAUDE\\\\supervisor.html'' ''f:\\\\RINKESH_CLAUDE\\\\deploy\\\\supervisor.html'' -Force; Write-Host ''Copied''\")",
+      "Bash(powershell -Command \"Select-String -Path ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' -Pattern ''waChatGroup|openDM|wa-conv'' | Select-Object -First 10\")",
+      "Bash(powershell -Command \"Select-String -Path ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' -Pattern ''function openWAChat'' | Select-Object -First 5\")",
+      "Bash(powershell -Command \":*)",
+      "Bash(powershell -Command \"Select-String -Path ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' -Pattern ''dash-content|wa-title|renderDash|wa-header'' | Select-Object -First 15\")"
+    ]
+  }
+}

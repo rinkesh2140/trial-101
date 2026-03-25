@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Patel Infrastructure — App Launcher</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0d2240 0%, #1D5FA8 60%, #2563EB 100%);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .logo { font-size: 56px; margin-bottom: 10px; }
+  h1 { color: #fff; font-size: 22px; font-weight: 800; margin-bottom: 4px; text-align: center; }
+  p  { color: rgba(255,255,255,0.55); font-size: 13px; margin-bottom: 36px; text-align: center; }
+  .cards { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 380px; }
+  .card {
+    background: rgba(255,255,255,0.97); border-radius: 16px;
+    padding: 22px 24px; text-decoration: none; color: inherit;
+    display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+  .card:active { transform: scale(0.98); }
+  .card-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0;
+  }
+  .card-icon.blue   { background: #EEF4FD; }
+  .card-icon.orange { background: #FFF4EE; }
+  .card-title { font-size: 16px; font-weight: 700; color: #0F172A; margin-bottom: 3px; }
+  .card-sub   { font-size: 12px; color: #64748B; }
+  .arrow { margin-left: auto; font-size: 20px; color: #CBD5E1; flex-shrink: 0; }
+  .divider { color: rgba(255,255,255,0.3); font-size: 12px; text-align: center; margin: 8px 0; }
+  .local-note { color: rgba(255,255,255,0.4); font-size: 11px; text-align: center; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <div class="logo">🏗️</div>
+  <h1>Patel Infrastructure</h1>
+  <p>Surat Smart City Road Project</p>
+
+  <div class="cards">
+    <a class="card" href="https://trial-101-d39b1.web.app/supervisor.html" target="_blank">
+      <div class="card-icon blue">👷</div>
+      <div>
+        <div class="card-title">Employee Portal</div>
+        <div class="card-sub">Supervisor &amp; Staff App — Live</div>
+      </div>
+      <div class="arrow">›</div>
+    </a>
+
+    <a class="card" href="https://trial-101-d39b1.web.app/labour.html" target="_blank">
+      <div class="card-icon orange">📋</div>
+      <div>
+        <div class="card-title">Labour Management</div>
+        <div class="card-sub">Worker Attendance System — Live</div>
+      </div>
+      <div class="arrow">›</div>
+    </a>
+
+    <div class="divider">── local preview (no login required) ──</div>
+
+    <a class="card" href="deploy/supervisor.html" target="_blank">
+      <div class="card-icon blue">🖥️</div>
+      <div>
+        <div class="card-title">Employee Portal</div>
+        <div class="card-sub">Local deploy folder preview</div>
+      </div>
+      <div class="arrow">›</div>
+    </a>
+
+    <a class="card" href="deploy/labour.html" target="_blank">
+      <div class="card-icon orange">🖥️</div>
+      <div>
+        <div class="card-title">Labour Management</div>
+        <div class="card-sub">Local deploy folder preview</div>
+      </div>
+      <div class="arrow">›</div>
+    </a>
+  </div>
+
+  <div class="local-note">Double-click open-app.html to open this launcher</div>
+</body>
+</html>
