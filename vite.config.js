@@ -1,15 +1,14 @@
-import { defineConfig } from 'vite'
-import { resolve } from 'path'
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        supervisor: resolve(__dirname, 'supervisor.html'),
-        openApp: resolve(__dirname, 'open-app.html'),
-        pitchDeck: resolve(__dirname, 'pitch-deck.html'),
+        main: 'index.html',
+        worker: 'worker.html',
+        openApp: 'open-app.html',
+        pitch: 'pitch-deck.html'
       }
     }
   }
-})
+});
