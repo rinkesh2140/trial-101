@@ -578,10 +578,9 @@ input:focus, select:focus { border-color: #27ae60; }
 async function getWorkers() {
   const { data, error } = await supabaseClient.from('lms_workers').select('*');
   if (error) { console.error('getWorkers fail:', error); return []; }
-  // Map snake_case to camelCase if necessary, but our schema uses snake_case
   return data.map(w => ({
     id: w.id, name: w.name, skill: w.skill, mobile: w.mobile,
-    isCompanion: w.is_companion, enrolled: w.enrolled_date, qrCode: w.qr_code
+    isCompanion: w.isCompanion || false, enrolled: w.enrolledDate || '', qrCode: w.qrCode || ''
   }));
 }
 
@@ -589,7 +588,7 @@ async function saveWorkers(workers) {
   // Upsert all workers
   const items = workers.map(w => ({
     id: w.id, name: w.name, skill: w.skill, mobile: w.mobile,
-    is_companion: w.isCompanion, enrolled_date: w.enrolled, qr_code: w.qrCode
+    isCompanion: w.isCompanion || false, enrolledDate: w.enrolled || '', qrCode: w.qrCode || ''
   }));
   const { error } = await supabaseClient.from('lms_workers').upsert(items);
   if (error) console.error('saveWorkers fail:', error);
@@ -599,15 +598,15 @@ async function getAttendance() {
   const { data, error } = await supabaseClient.from('lms_attendance').select('*');
   if (error) { console.error('getAttendance fail:', error); return []; }
   return data.map(a => ({
-    workerId: a.worker_id, date: a.date, inTime: a.in_time, outTime: a.out_time,
-    scannedInBy: a.scanned_in_by, scannedOutBy: a.scanned_out_by
+    workerId: a.workerId, date: a.date, inTime: a.inTime, outTime: a.outTime,
+    scannedInBy: a.scannedInBy, scannedOutBy: a.scannedOutBy
   }));
 }
 
 async function saveAttendance(att) {
   const items = att.map(a => ({
-    worker_id: a.workerId, date: a.date, in_time: a.inTime, out_time: a.outTime,
-    scanned_in_by: a.scannedInBy, scanned_out_by: a.scannedOutBy
+    workerId: a.workerId, date: a.date, inTime: a.inTime, outTime: a.outTime,
+    scannedInBy: a.scannedInBy || null, scannedOutBy: a.scannedOutBy || null
   }));
   const { error } = await supabaseClient.from('lms_attendance').upsert(items);
   if (error) console.error('saveAttendance fail:', error);

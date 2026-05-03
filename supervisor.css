@@ -486,3 +486,390 @@ label {
 h2, h3, h4 { color: var(--text); }
 a { color: var(--brand); }
 hr { border: none; border-top: 1px solid var(--glass-border); margin: 16px 0; }
+
+/* ════════════════════════════════════════
+   MOBILE UX ENHANCEMENTS
+   ════════════════════════════════════════ */
+
+/* ── Smooth scroll for all scrollable areas ── */
+* { scroll-behavior: smooth; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+
+/* ── Loading screen improvement ── */
+#fb-loading {
+  background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%) !important;
+}
+#fb-loading::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(99,102,241,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 70%, rgba(139,92,246,0.12) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* ── Nav pill indicator ── */
+nav#main-nav button {
+  position: relative;
+  overflow: hidden;
+}
+nav#main-nav button::before {
+  content: '';
+  position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 3px; border-radius: 99px;
+  background: var(--brand);
+  transition: width 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+nav#main-nav button.active::before { width: 28px; }
+nav#main-nav button.active {
+  background: rgba(99,102,241,0.1);
+  color: var(--brand);
+}
+nav#main-nav button:active { transform: scale(0.92); }
+
+/* ── Better section transitions ── */
+section {
+  display: none;
+  animation: fadeSlideIn 0.22s ease-out;
+}
+section.active { display: block; }
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Enhanced cards ── */
+.card, .task-card, .emp-card, .crew-card, .contact-card, .dir-card, .att-card, .note-card {
+  transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+.card:active, .task-card:active, .emp-card:active, .crew-card:active {
+  transform: scale(0.975);
+  border-color: rgba(99,102,241,0.4);
+  box-shadow: 0 2px 12px rgba(99,102,241,0.2);
+}
+
+/* ── Hero attendance button enhanced ── */
+.hero-att-btn {
+  position: relative; overflow: hidden;
+  letter-spacing: 0.02em;
+}
+.hero-att-btn.in  { background: linear-gradient(135deg, #fff 0%, #f0f4ff 100%); color: var(--brand-dark); }
+.hero-att-btn.out {
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255,255,255,0.35);
+}
+.hero-att-btn:active { transform: scale(0.96) !important; }
+
+/* ── Stat boxes improved ── */
+.stat-box {
+  transition: transform 0.15s, border-color 0.2s;
+  cursor: default;
+}
+.stat-box:active { transform: scale(0.96); }
+.sv { animation: countUp 0.5s ease-out; }
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Dashboard hero subtle pulse ── */
+.dash-hero {
+  animation: heroEnter 0.4s ease-out;
+}
+@keyframes heroEnter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Better input focus glow ── */
+input:focus, select:focus, textarea:focus {
+  border-color: var(--brand);
+  background: rgba(99,102,241,0.06);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.18), 0 2px 8px rgba(0,0,0,0.2);
+  transform: translateY(-1px);
+}
+
+/* ── Enhanced login button ── */
+#login-card .btn-primary, #register-card .btn-accent {
+  position: relative; overflow: hidden;
+  letter-spacing: 0.03em;
+  transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+}
+#login-card .btn-primary:active, #register-card .btn-accent:active {
+  transform: scale(0.97);
+}
+
+/* ── Slim header subtle ── */
+#slim-header {
+  transition: background 0.2s;
+}
+
+/* ── Enhanced bottom nav ── */
+nav#main-nav {
+  transition: box-shadow 0.3s;
+}
+nav#main-nav button .tab-label {
+  transition: color 0.2s, opacity 0.2s;
+}
+nav#main-nav button:not(.active) .tab-label { opacity: 0.65; }
+
+/* ── Crew / employee card improved ── */
+.emp-card, .crew-card {
+  display: flex; align-items: center; gap: 12px;
+}
+.emp-avatar {
+  width: 44px; height: 44px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; color: #fff; flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.dir-info { flex: 1; min-width: 0; }
+.emp-name { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-detail { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.emp-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+
+/* ── Avatar initials ── */
+.avatar-badge {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; flex-shrink: 0;
+}
+
+/* ── Message bubbles improved ── */
+#wa-chat-msgs {
+  display: flex; flex-direction: column;
+  padding: 16px 14px;
+  overflow-y: auto; flex: 1;
+}
+.wa-bubble {
+  animation: bubbleIn 0.2s ease-out;
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: scale(0.94) translateY(4px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+.wa-bubble.sent {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+  box-shadow: 0 2px 12px rgba(99,102,241,0.35);
+}
+.wa-bubble.recv {
+  background: rgba(30,41,59,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── Modal improved ── */
+.modal-box {
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ── Toast improved ── */
+#toast {
+  white-space: nowrap;
+  max-width: calc(100vw - 48px);
+}
+#toast.info { color: var(--text-2); }
+
+/* ── Profile rows ── */
+.profile-row { transition: background 0.15s; }
+.profile-row:active { background: rgba(255,255,255,0.03); }
+
+/* ── Icon buttons ── */
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);
+  color: var(--text-2); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.icon-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.12); }
+.ib-view  { color: var(--brand); }
+.ib-edit  { color: var(--warning); }
+.ib-del   { color: var(--danger); }
+.ib-msg   { color: var(--success); }
+.ib-call  { color: var(--success); }
+
+/* ── Availability grid badges ── */
+.badge-onsite  { background: rgba(22,163,74,0.18);  color: #86efac; border-color: rgba(22,163,74,0.3); }
+.badge-wfh     { background: rgba(37,99,235,0.18);  color: #93c5fd; border-color: rgba(37,99,235,0.3); }
+.badge-leave   { background: rgba(220,38,38,0.18);  color: #fca5a5; border-color: rgba(220,38,38,0.3); }
+.badge-field   { background: rgba(217,119,6,0.18);  color: #fcd34d; border-color: rgba(217,119,6,0.3); }
+.badge-holiday { background: rgba(100,116,139,0.18);color: #94a3b8; border-color: rgba(100,116,139,0.3); }
+.badge-halfday { background: rgba(124,58,237,0.18); color: #c4b5fd; border-color: rgba(124,58,237,0.3); }
+
+/* ── Crew tab row ── */
+.crew-tabs { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.crew-tabs::-webkit-scrollbar { display: none; }
+
+/* ── Animated badge pulse for unread messages ── */
+.msg-badge {
+  position: absolute; top: 4px; right: 4px;
+  background: var(--danger); color: #fff;
+  font-size: 9px; font-weight: 800;
+  min-width: 16px; height: 16px; border-radius: 99px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+  animation: badgePulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--bg); }
+  50% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px rgba(239,68,68,0.25); }
+}
+
+/* ── WA conversation list items ── */
+.wa-conv-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; cursor: pointer;
+  border-bottom: 1px solid var(--glass-border);
+  transition: background 0.15s;
+  position: relative;
+}
+.wa-conv-item:active { background: rgba(255,255,255,0.04); }
+.wa-conv-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.wa-conv-info { flex: 1; min-width: 0; }
+.wa-conv-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.wa-conv-preview { font-size: 12px; color: var(--text-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-conv-time { font-size: 11px; color: var(--text-3); flex-shrink: 0; }
+
+/* ── WA chat header ── */
+.wa-chat-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; position: sticky; top: 0; z-index: 10;
+  background: rgba(15,23,42,0.97);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+}
+.wa-back-btn {
+  background: none; border: none; color: var(--text-2); cursor: pointer;
+  font-size: 24px; padding: 4px 8px; border-radius: 8px;
+  transition: background 0.15s;
+}
+.wa-back-btn:active { background: rgba(255,255,255,0.08); }
+.wa-chat-hdr-info { flex: 1; }
+.wa-chat-hdr-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.wa-chat-hdr-sub  { font-size: 11px; color: var(--text-3); }
+
+/* ── WA input bar ── */
+.wa-input-bar {
+  display: flex; gap: 8px; padding: 10px 14px;
+  background: rgba(15,23,42,0.97);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--glass-border);
+  position: sticky; bottom: 0;
+}
+.wa-input-bar input {
+  flex: 1; margin-bottom: 0; padding: 11px 16px; font-size: 14px;
+  border-radius: 99px; background: rgba(255,255,255,0.07);
+}
+.wa-send-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  border: none; color: #fff; cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+  transition: transform 0.15s;
+}
+.wa-send-btn:active { transform: scale(0.9); }
+
+/* ── Schedule planner ── */
+.plan-day-card {
+  background: var(--card); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md); margin-bottom: 10px; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.plan-day-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; cursor: pointer;
+}
+.plan-day-hdr:active { background: rgba(255,255,255,0.03); }
+
+/* ── Attendance history card ── */
+.att-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; cursor: default;
+}
+.att-date-badge {
+  min-width: 44px; text-align: center;
+  background: rgba(99,102,241,0.1); border-radius: 10px; padding: 6px;
+}
+.att-date-day  { font-size: 18px; font-weight: 800; color: var(--brand); line-height: 1; }
+.att-date-week { font-size: 10px; color: var(--text-3); text-transform: uppercase; }
+
+/* ── Task priority left border glow ── */
+.task-card.high   { border-left: 3px solid var(--danger);  box-shadow: -2px 0 12px rgba(239,68,68,0.15); }
+.task-card.medium { border-left: 3px solid var(--warning); box-shadow: -2px 0 12px rgba(245,158,11,0.15); }
+.task-card.low    { border-left: 3px solid var(--success); box-shadow: -2px 0 12px rgba(16,185,129,0.15); }
+
+/* ── Labour banner in reports ── */
+.labour-banner {
+  background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.08));
+  border: 1px solid rgba(16,185,129,0.25);
+  border-radius: var(--radius-md); padding: 16px;
+}
+.lb-title { font-size: 15px; font-weight: 700; color: var(--success); margin-bottom: 4px; }
+.lb-sub   { font-size: 12px; color: var(--text-3); margin-bottom: 14px; }
+
+/* ── Punch request cards ── */
+.punch-req-card {
+  background: var(--card); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md); padding: 16px; margin-bottom: 10px;
+}
+.punch-req-card.pending  { border-left: 3px solid var(--warning); }
+.punch-req-card.approved { border-left: 3px solid var(--success); }
+.punch-req-card.rejected { border-left: 3px solid var(--danger); }
+
+/* ── More hub cards ── */
+.more-nav-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md); padding: 16px;
+  cursor: pointer; transition: all 0.15s;
+}
+.more-nav-card:active {
+  transform: scale(0.975);
+  border-color: rgba(99,102,241,0.3);
+}
+
+/* ── Better select arrow ── */
+select {
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px !important;
+}
+
+/* ── Page-level padding safe area ── */
+section {
+  padding-bottom: calc(var(--nav-h) + 48px + env(safe-area-inset-bottom));
+}
+
+/* ── Large touch targets (min 48px) ── */
+button, .btn, .btn-sm, .crew-tab, .cat-btn {
+  min-height: 36px;
+}
+.btn, .hero-att-btn { min-height: 48px; }
+
+/* ── Ripple effect on buttons ── */
+.btn, .hero-att-btn {
+  position: relative; overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute; inset: 0; border-radius: inherit;
+  background: rgba(255,255,255,0.12);
+  opacity: 0; transition: opacity 0.15s;
+}
+.btn:active::after { opacity: 1; }
+
+/* ── Visible scrollbar in reports ── */
+.rpt-scroll::-webkit-scrollbar { height: 6px; }
+.rpt-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); }

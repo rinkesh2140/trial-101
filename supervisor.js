@@ -557,29 +557,39 @@ async function doRegister() {
   const err   = document.getElementById('register-error');
 
   if (!name || !email || !pass) { err.textContent = '✗ All fields required'; return; }
-  if (getEmployees().find(e => e.email === email)) { err.textContent = '✗ Email already registered'; return; }
+  err.textContent = 'Registering...';
 
-  // Generate unique EMP ID
-  const lastEmp = getEmployees().sort((a,b) => b.id.localeCompare(a.id))[0];
-  const nextNum = parseInt(lastEmp?.id.replace('EMP','') || '0') + 1;
+  // Get default company
+  const { data: comps } = await supabaseClient.from('companies').select('id').limit(1);
+  const companyId = comps?.[0]?.id;
+  if (!companyId) { err.textContent = '✗ App not configured — contact admin'; return; }
+
+  // Check email uniqueness in DB
+  const { data: existEmail } = await supabaseClient.from('employees').select('id').eq('email', email).limit(1);
+  if (existEmail?.length > 0) { err.textContent = '✗ Email already registered'; return; }
+
+  // Generate unique EMP ID from DB
+  const { data: lastEmps } = await supabaseClient.from('employees')
+    .select('id').eq('company_id', companyId).order('id', { ascending: false }).limit(1);
+  const nextNum = parseInt(lastEmps?.[0]?.id?.replace('EMP','') || '0') + 1;
   const empId   = 'EMP' + String(nextNum).padStart(3, '0');
 
   const newEmp = {
     id: empId, name, email, role: 'TK', designation: 'Timekeeper',
     avatar: name.charAt(0).toUpperCase(), active: true,
-    joinDate: today(), phone: '', status: 'active'
+    joinDate: today(), status: 'active', company_id: companyId
   };
-
   const newUser = {
-    employee_id: empId, username: email, password: pass, role: 'TK', email
+    employee_id: empId, username: email, password: pass, role: 'TK', email, company_id: companyId
   };
 
   try {
-    await sbUpsert('employees', [newEmp]);
-    await sbUpsert('users', [newUser]);
+    await supabaseClient.from('employees').insert([newEmp]);
+    await supabaseClient.from('users').insert([newUser]);
     DB.employees.push(newEmp);
     DB.users.push(newUser);
-    showToast('Registration successful! Please login.', 'success');
+    err.textContent = '';
+    showToast('Registered! Login with your email.', 'success');
     toggleAuth(false);
   } catch (e) {
     err.textContent = '✗ Registration failed. Try again.';
@@ -651,20 +661,49 @@ function hasAccess(tab) {
 }
 
 async function initAuth() {
-  const { data: users } = await supabaseClient.from('users').select('username').limit(1);
-  if (!users || users.length === 0) {
-    const adminUser = { employee_id: 'ADMIN001', username: 'admin', password: 'admin123', role: 'SU' };
-    const adminEmp  = { id: 'ADMIN001', name: 'Super Admin', role: 'SU', designation: 'Super Admin', active: true, avatar: '👑' };
-    await sbUpsert('employees', [adminEmp]);
-    await sbUpsert('users', [adminUser]);
-  }
-
-  const s = getSession();
-  if (s) {
-    await loadAllFromSupabase(s.companyId, s.role);
-    showApp();
-  } else {
+  try {
+    const { data: compData, error: ce } = await supabaseClient.from('companies').select('id').limit(1);
+    if (ce) throw new Error('Cannot reach database: ' + ce.message);
+    if (!compData || compData.length === 0) {
+      await firstTimeSetup();
+    }
+    const s = getSession();
+    if (s) {
+      await loadAllFromSupabase(s.companyId, s.role);
+      showApp();
+    } else {
+      document.getElementById('fb-loading').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  } catch(err) {
+    console.error('initAuth error:', err);
+    document.getElementById('fb-loading').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('login-error').textContent = '⚠ Connection error — check internet';
+  }
+}
+
+async function firstTimeSetup() {
+  const loaderSub = document.querySelector('#fb-loading div:nth-child(3)');
+  if (loaderSub) loaderSub.textContent = 'First-time setup…';
+  try {
+    const { data: comp, error: ce } = await supabaseClient.from('companies')
+      .insert([{ name: 'Patel Infrastructure Pvt. Ltd.' }]).select().single();
+    if (ce || !comp) throw new Error('Company creation failed: ' + (ce?.message || ''));
+    const compId = comp.id;
+
+    await supabaseClient.from('sites')
+      .insert([{ name: 'Surat Smart City Road Project', company_id: compId }]);
+
+    // Temp session so sbUpsert injects company_id into all seed records
+    sessionStorage.setItem('sup_session', JSON.stringify({ companyId: compId, role: 'PM', employeeId: 'EMP001' }));
+    await seedData();
+    sessionStorage.removeItem('sup_session');
+    if (loaderSub) loaderSub.textContent = 'Setup complete — please login';
+    console.log('✓ First-time setup done. Login: rajesh.patel / admin123');
+  } catch(err) {
+    console.error('firstTimeSetup error:', err);
+    sessionStorage.removeItem('sup_session');
   }
 }
 
@@ -715,6 +754,8 @@ function showApp() {
   buildNav();
   updateMsgBadge();
   showTab('dashboard');
+  // Run seed migrations in background after login
+  setTimeout(() => seedData().catch(console.error), 1800);
 }
 
 function changeActiveSite(siteId) {
@@ -1188,7 +1229,7 @@ async function markSelfIN() {
     showToast('Already IN — mark OUT first','error'); return;
   }
   if (idx === -1) {
-    att.push({ employeeId:emp.id, date:today(), punches:[{inTime:nowTime(),outTime:null}] });
+    att.push({ id:emp.id+'_'+today(), employeeId:emp.id, date:today(), punches:[{inTime:nowTime(),outTime:null}] });
   } else {
     att[idx].punches.push({inTime:nowTime(), outTime:null});
   }
@@ -1518,7 +1559,7 @@ async function applyAvailChanges() {
   Object.entries(pendingAvailChanges).forEach(([date, status]) => {
     const idx = avail.findIndex(a=>a.employeeId===emp.id && a.date===date);
     if (idx > -1) avail[idx].status = status;
-    else avail.push({ employeeId:emp.id, date, status });
+    else avail.push({ id:emp.id+'_'+date, employeeId:emp.id, date, status });
   });
   await saveAvailList(avail);
   const count = Object.keys(pendingAvailChanges).length;
@@ -3131,6 +3172,10 @@ async function deleteContact(id) {
 // SEED DATA
 // ══════════════════════════════════════════════════════════
 async function seedData() {
+  // Quick exit if fully seeded
+  const _allEmps = getEmployees();
+  if (_allEmps.length >= 19 && _allEmps.find(e => e.bloodGroup)) return;
+
   // v4: add extended profile fields (blood group, birthdate, address, vehicle) to all employees
   const existingEmps4 = getEmployees();
   if (existingEmps4.length > 0 && !existingEmps4.find(e => e.bloodGroup)) {
@@ -3176,16 +3221,16 @@ async function seedData() {
       { id:'EMP019', name:'Tarun Mishra',     role:'SE', designation:'Senior Site Engineer', department:'Civil',    mobile:'9876501019', username:'tarun.mishra',     avatar:'TM', joinDate:'2023-07-01', active:true, status:'active' }
     ];
     const newUsers = [
-      { username:'suresh.yadav',   password:'pass123', employeeId:'EMP010', role:'EN' },
-      { username:'priya.nair',     password:'pass123', employeeId:'EMP011', role:'JE' },
-      { username:'amit.verma',     password:'pass123', employeeId:'EMP012', role:'SV' },
-      { username:'rakesh.gupta',   password:'pass123', employeeId:'EMP013', role:'AS' },
-      { username:'sneha.patil',    password:'pass123', employeeId:'EMP014', role:'TK' },
-      { username:'vivek.kumar',    password:'pass123', employeeId:'EMP015', role:'EN' },
-      { username:'dinesh.bhai',    password:'pass123', employeeId:'EMP016', role:'SV' },
-      { username:'kavita.sharma',  password:'pass123', employeeId:'EMP017', role:'JE' },
-      { username:'mohan.lal',      password:'pass123', employeeId:'EMP018', role:'AS' },
-      { username:'tarun.mishra',   password:'pass123', employeeId:'EMP019', role:'SE' }
+      { username:'suresh.yadav',   password:'pass123', employee_id:'EMP010', role:'EN' },
+      { username:'priya.nair',     password:'pass123', employee_id:'EMP011', role:'JE' },
+      { username:'amit.verma',     password:'pass123', employee_id:'EMP012', role:'SV' },
+      { username:'rakesh.gupta',   password:'pass123', employee_id:'EMP013', role:'AS' },
+      { username:'sneha.patil',    password:'pass123', employee_id:'EMP014', role:'TK' },
+      { username:'vivek.kumar',    password:'pass123', employee_id:'EMP015', role:'EN' },
+      { username:'dinesh.bhai',    password:'pass123', employee_id:'EMP016', role:'SV' },
+      { username:'kavita.sharma',  password:'pass123', employee_id:'EMP017', role:'JE' },
+      { username:'mohan.lal',      password:'pass123', employee_id:'EMP018', role:'AS' },
+      { username:'tarun.mishra',   password:'pass123', employee_id:'EMP019', role:'SE' }
     ];
     const allEmps = [...existingEmps3, ...newEmps];
     const allUsers = getUsers();
@@ -3228,7 +3273,7 @@ async function seedData() {
         const outMin = Math.floor(Math.random()*10);
         const inT  = inH.split(':')[0]+':'+String(+inH.split(':')[1]+inMin).padStart(2,'0');
         const outT = outH.split(':')[0]+':'+String(+outH.split(':')[1]+outMin).padStart(2,'0');
-        newAtt.push({ employeeId:empId, date:d, inTime:inT, outTime:outT });
+        newAtt.push({ id:empId+'_'+d, employeeId:empId, date:d, punches:[{inTime:inT,outTime:outT}] });
       }
     });
     saveSupAtt([...existingAtt, ...newAtt]);
@@ -3353,7 +3398,7 @@ async function seedData() {
     emps.push({ id:'EMP009', name:'Meena Joshi', role:'HR', designation:'HR Manager', department:'Admin', mobile:'9876501009', username:'meena.joshi', avatar:'MJ', joinDate:'2023-09-01', active:true, status:'active', hrRoleEditApproved:false });
     saveEmployees(emps);
     if (!users.find(u => u.username === 'meena.joshi')) {
-      users.push({ username:'meena.joshi', password:'pass123', employeeId:'EMP009', role:'HR' });
+      users.push({ username:'meena.joshi', password:'pass123', employee_id:'EMP009', role:'HR' });
       saveUsers(users);
     }
     // Also ensure existing employees have status field
@@ -3376,15 +3421,15 @@ async function seedData() {
   ];
 
   const users = [
-    { username:'rajesh.patel',    password:'admin123', employeeId:'EMP001', role:'PM' },
-    { username:'bhavesh.desai',   password:'pass123',  employeeId:'EMP002', role:'SM' },
-    { username:'chirag.mehta',    password:'pass123',  employeeId:'EMP003', role:'SE' },
-    { username:'dhaval.shah',     password:'pass123',  employeeId:'EMP004', role:'EN' },
-    { username:'hitesh.chauhan',  password:'pass123',  employeeId:'EMP005', role:'SV' },
-    { username:'kalpesh.solanki', password:'pass123',  employeeId:'EMP006', role:'JE' },
-    { username:'nilesh.rathod',   password:'pass123',  employeeId:'EMP007', role:'AS' },
-    { username:'paresh.trivedi',  password:'pass123',  employeeId:'EMP008', role:'TK' },
-    { username:'meena.joshi',     password:'pass123',  employeeId:'EMP009', role:'HR' }
+    { username:'rajesh.patel',    password:'admin123', employee_id:'EMP001', role:'PM' },
+    { username:'bhavesh.desai',   password:'pass123',  employee_id:'EMP002', role:'SM' },
+    { username:'chirag.mehta',    password:'pass123',  employee_id:'EMP003', role:'SE' },
+    { username:'dhaval.shah',     password:'pass123',  employee_id:'EMP004', role:'EN' },
+    { username:'hitesh.chauhan',  password:'pass123',  employee_id:'EMP005', role:'SV' },
+    { username:'kalpesh.solanki', password:'pass123',  employee_id:'EMP006', role:'JE' },
+    { username:'nilesh.rathod',   password:'pass123',  employee_id:'EMP007', role:'AS' },
+    { username:'paresh.trivedi',  password:'pass123',  employee_id:'EMP008', role:'TK' },
+    { username:'meena.joshi',     password:'pass123',  employee_id:'EMP009', role:'HR' }
   ];
 
   // Self-attendance: 14 days, each emp has 2-3 absences
@@ -3411,7 +3456,7 @@ async function seedData() {
       const outMin = Math.floor(Math.random()*10);
       const inT    = inH.split(':')[0]+':'+String(+inH.split(':')[1]+inMin).padStart(2,'0');
       const outT   = i===0 && empId==='EMP003' ? null : outH.split(':')[0]+':'+String(+outH.split(':')[1]+outMin).padStart(2,'0');
-      attendance.push({ employeeId:empId, date:d, inTime:inT, outTime:outT });
+      attendance.push({ id:empId+'_'+d, employeeId:empId, date:d, punches:[{inTime:inT,outTime:outT}] });
     }
   });
 
@@ -3430,7 +3475,8 @@ async function seedData() {
   const availability = [];
   availSeed.forEach(({empId, plans}) => {
     Object.entries(plans).forEach(([offset, status]) => {
-      availability.push({ employeeId:empId, date:dateFuture(+offset), status });
+      const d = dateFuture(+offset);
+      availability.push({ id:empId+'_'+d, employeeId:empId, date:d, status });
     });
   });
 
@@ -3477,7 +3523,7 @@ async function seedData() {
   await saveNotes(notes);
   await saveContacts(contacts);
   DB.seeded = true;
-  await sbUpsert('meta', [{ key: 'config', seeded: true }]);
+  await supabaseClient.from('meta').upsert([{ key: 'config', seeded: true }], { onConflict: 'key' });
 }
 
 // ══════════════════════════════════════════════════════════
