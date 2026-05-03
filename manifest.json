@@ -1,0 +1,14 @@
+{
+  "name": "Patel Infrastructure Suite",
+  "short_name": "PI Suite",
+  "description": "Multi-tenant site management portal for Patel Infrastructure Pvt. Ltd.",
+  "start_url": "/supervisor.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "https://via.placeholder.com/192x192/6366f1/ffffff?text=PI", "sizes": "192x192", "type": "image/png" },
+    { "src": "https://via.placeholder.com/512x512/6366f1/ffffff?text=PI", "sizes": "512x512", "type": "image/png" }
+  ]
+}

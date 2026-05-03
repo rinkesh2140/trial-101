@@ -3,14 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#1D5FA8">
+<meta name="theme-color" content="#6366f1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Supervisor Portal — Patel Infrastructure</title>
+<meta name="description" content="Patel Infrastructure Site Management Suite — multi-tenant portal for supervisors, site managers, and employees.">
+<title>Patel Infrastructure — Site Management Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="supervisor.css">
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -27,15 +30,33 @@
   <div class="login-logo">🏗️</div>
   <div class="login-title">Patel Infrastructure Pvt. Ltd.</div>
   <div class="login-sub">Supervisor & Staff Portal</div>
-  <div class="login-card">
+  <div id="login-card">
     <h3>Sign In</h3>
-    <label for="l-user">Username</label>
-    <input type="text" id="l-user" placeholder="Enter username" autocomplete="off">
+    <label for="l-user">Email / Username</label>
+    <input type="text" id="l-user" placeholder="Enter email" autocomplete="off">
     <label for="l-pass">Password</label>
     <input type="password" id="l-pass" placeholder="Enter password"
            onkeydown="if(event.key==='Enter') doLogin()">
     <button class="btn btn-primary" onclick="doLogin()">Login →</button>
+    <div style="text-align:center;margin-top:16px;">
+      <a href="#" onclick="toggleAuth(true)" style="color:var(--brand);font-size:13px;font-weight:700;text-decoration:none">New here? Register Account</a>
+    </div>
     <div id="login-error"></div>
+  </div>
+
+  <div id="register-card" style="display:none">
+    <h3>Employee Registration</h3>
+    <label for="r-name">Full Name</label>
+    <input type="text" id="r-name" placeholder="Enter full name" autocomplete="off">
+    <label for="r-email">Email Address</label>
+    <input type="email" id="r-email" placeholder="Enter your email" autocomplete="off">
+    <label for="r-pass">Password</label>
+    <input type="password" id="r-pass" placeholder="Create password" autocomplete="off">
+    <button class="btn btn-accent" onclick="doRegister()">Register Now →</button>
+    <div style="text-align:center;margin-top:16px;">
+      <a href="#" onclick="toggleAuth(false)" style="color:var(--text-3);font-size:13px;font-weight:700;text-decoration:none">Already have an account? Login</a>
+    </div>
+    <div id="register-error" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center"></div>
   </div>
   <div class="login-footer">Surat Smart City Road Project</div>
 </div>
@@ -49,9 +70,10 @@
       <div class="company">🏗️ Patel Infrastructure</div>
       <div class="project">Surat Smart City Road Project</div>
     </div>
-    <div class="hdr-right">
+    <div class="hdr-right" style="display:flex;align-items:center;">
+      <select id="header-site-select" onchange="changeActiveSite(this.value)" style="display:none; margin-right: 10px; padding: 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white;"></select>
       <div class="user-avatar" id="hdr-avatar" onclick="showTab('profile')" style="cursor:pointer">—</div>
-      <div id="hdr-user-info">
+      <div id="hdr-user-info" style="margin-left:10px;">
         <div class="hdr-name" id="hdr-name">—</div>
         <div class="hdr-role" id="hdr-role">—</div>
       </div>
@@ -65,6 +87,7 @@
       <span id="slim-header-title" style="font-size:15px;font-weight:700;color:var(--text)"></span>
     </div>
     <div style="display:flex;align-items:center;gap:4px">
+      <select id="slim-site-select" onchange="changeActiveSite(this.value)" style="display:none; margin-right: 8px; padding: 2px 4px; border-radius: 4px; border: 1px solid #ccc; background: white; color: black; max-width: 100px;"></select>
       <button id="slim-extra-btn" style="display:none;background:none;border:none;font-size:20px;cursor:pointer;padding:6px;color:var(--brand);line-height:1"></button>
       <div class="user-avatar" id="slim-avatar" onclick="showTab('profile')" style="cursor:pointer;background:var(--brand);color:#fff;border:none;box-shadow:none;width:32px;height:32px;font-size:11px">—</div>
     </div>
@@ -196,6 +219,26 @@
   <section id="sec-work">
     <div id="task-controls" style="margin-bottom:12px"></div>
     <div id="task-list"></div>
+  </section>
+
+  <!-- ❻·⁵ ADMIN — Superadmin Control Panel ── -->
+  <section id="sec-admin">
+    <div class="dash-hero" style="background:linear-gradient(135deg, #1e293b, #334155);margin-bottom:20px;">
+      <div class="hero-greet">Admin Control Center</div>
+      <div class="hero-sub" id="admin-pulse">Real-time Project Pulse</div>
+    </div>
+
+    <div class="stat-grid cols3">
+      <div class="stat-box"><div class="sv sv-blue" id="admin-stat-users">—</div><div class="sl">Total Users</div></div>
+      <div class="stat-box"><div class="sv sv-green" id="admin-stat-att">—</div><div class="sl">Att. Today</div></div>
+      <div class="stat-box"><div class="sv sv-orange" id="admin-stat-tasks">—</div><div class="sl">Open Tasks</div></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 14px 0">
+      <h2 style="margin:0">User Management</h2>
+      <button class="btn-sm btn-primary" onclick="openCreateUser()">+ New User</button>
+    </div>
+    <div id="admin-user-list"></div>
   </section>
 
   <!-- ⑥·⁵ MORE HUB ── -->
@@ -437,6 +480,66 @@
     <input type="number" id="ep-prior-exp" placeholder="e.g. 3.5 for 3 yrs 6 months" min="0" max="40" step="0.5">
     <div style="font-size:11px;color:var(--text-3);margin-top:-10px;margin-bottom:14px">Total work experience before joining Patel Infrastructure</div>
     <button class="btn btn-primary" onclick="saveProfileEdit()">Save Changes</button>
+  </div>
+</div>
+
+<!-- ── SUPERADMIN MODALS ── -->
+<div id="modal-create-company" class="modal-overlay" onclick="overlayClose(event,'modal-create-company')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Create Company</span>
+      <button class="modal-close" onclick="closeModal('modal-create-company')">✕</button>
+    </div>
+    <label>Company Name</label>
+    <input type="text" id="cc-name" placeholder="e.g. Acme Corp">
+    <button class="btn btn-primary" onclick="doCreateCompany()">Create</button>
+  </div>
+</div>
+
+<div id="modal-manage-company" class="modal-overlay" onclick="overlayClose(event,'modal-manage-company')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Manage Company Admins</span>
+      <button class="modal-close" onclick="closeModal('modal-manage-company')">✕</button>
+    </div>
+    <div id="mc-content" style="margin-bottom:14px; max-height:200px; overflow-y:auto;"></div>
+    <hr>
+    <h4>Add Admin User</h4>
+    <label>Admin Full Name</label>
+    <input type="text" id="mc-admin-name" placeholder="John Doe">
+    <label>Admin Username</label>
+    <input type="text" id="mc-admin-user" placeholder="admin.john">
+    <label>Admin Password</label>
+    <input type="text" id="mc-admin-pass" placeholder="password">
+    <input type="hidden" id="mc-company-id">
+    <button class="btn btn-primary" onclick="doAddCompanyAdmin()">Add Admin</button>
+  </div>
+</div>
+
+<div id="modal-create-site" class="modal-overlay" onclick="overlayClose(event,'modal-create-site')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Create Site</span>
+      <button class="modal-close" onclick="closeModal('modal-create-site')">✕</button>
+    </div>
+    <label>Site Name</label>
+    <input type="text" id="cs-name" placeholder="e.g. Surat Main Building">
+    <button class="btn btn-primary" onclick="doCreateSite()">Create</button>
+  </div>
+</div>
+
+<div id="modal-manage-site" class="modal-overlay" onclick="overlayClose(event,'modal-manage-site')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="manage-site-title">Manage Site</span>
+      <button class="modal-close" onclick="closeModal('modal-manage-site')">✕</button>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label>Assign Employees</label>
+      <div id="site-employee-list" style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); padding: 8px; border-radius: 4px;">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSiteEmployees()">Save Assignments</button>
   </div>
 </div>
 

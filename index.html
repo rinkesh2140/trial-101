@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Labour Management System</title>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://yzevducedcvxvugozmbu.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_sFuIGiOOco0RjlCVGG5C6Q_2VDCou5C';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -567,12 +573,46 @@ input:focus, select:focus { border-color: #27ae60; }
 
 <script>
 // ══════════════════════════════════════════════════════════
-// STORAGE
+// SUPABASE STORAGE
 // ══════════════════════════════════════════════════════════
-const getWorkers    = () => JSON.parse(localStorage.getItem('lms_workers')    || '[]');
-const saveWorkers   = d  => localStorage.setItem('lms_workers',    JSON.stringify(d));
-const getAttendance = () => JSON.parse(localStorage.getItem('lms_attendance') || '[]');
-const saveAttendance= d  => localStorage.setItem('lms_attendance', JSON.stringify(d));
+async function getWorkers() {
+  const { data, error } = await supabaseClient.from('lms_workers').select('*');
+  if (error) { console.error('getWorkers fail:', error); return []; }
+  // Map snake_case to camelCase if necessary, but our schema uses snake_case
+  return data.map(w => ({
+    id: w.id, name: w.name, skill: w.skill, mobile: w.mobile,
+    isCompanion: w.is_companion, enrolled: w.enrolled_date, qrCode: w.qr_code
+  }));
+}
+
+async function saveWorkers(workers) {
+  // Upsert all workers
+  const items = workers.map(w => ({
+    id: w.id, name: w.name, skill: w.skill, mobile: w.mobile,
+    is_companion: w.isCompanion, enrolled_date: w.enrolled, qr_code: w.qrCode
+  }));
+  const { error } = await supabaseClient.from('lms_workers').upsert(items);
+  if (error) console.error('saveWorkers fail:', error);
+}
+
+async function getAttendance() {
+  const { data, error } = await supabaseClient.from('lms_attendance').select('*');
+  if (error) { console.error('getAttendance fail:', error); return []; }
+  return data.map(a => ({
+    workerId: a.worker_id, date: a.date, inTime: a.in_time, outTime: a.out_time,
+    scannedInBy: a.scanned_in_by, scannedOutBy: a.scanned_out_by
+  }));
+}
+
+async function saveAttendance(att) {
+  const items = att.map(a => ({
+    worker_id: a.workerId, date: a.date, in_time: a.inTime, out_time: a.outTime,
+    scanned_in_by: a.scannedInBy, scanned_out_by: a.scannedOutBy
+  }));
+  const { error } = await supabaseClient.from('lms_attendance').upsert(items);
+  if (error) console.error('saveAttendance fail:', error);
+}
+
 const today         = () => new Date().toISOString().split('T')[0];
 const nowTime       = () => new Date().toTimeString().slice(0,5);
 
@@ -644,8 +684,9 @@ function calcDuration(inTime, outTime) {
 // ══════════════════════════════════════════════════════════
 // WORKER ID
 // ══════════════════════════════════════════════════════════
-function generateWorkerId() {
-  const ids = new Set(getWorkers().map(w => w.id));
+async function generateWorkerId() {
+  const workers = await getWorkers();
+  const ids = new Set(workers.map(w => w.id));
   let id;
   do { id = String(Math.floor(1000000 + Math.random()*9000000)); }
   while (ids.has(id));
@@ -677,7 +718,7 @@ function showSection(name, btn) {
 // ══════════════════════════════════════════════════════════
 // ENROLL
 // ══════════════════════════════════════════════════════════
-function enrollWorker() {
+async function enrollWorker() {
   const name     = document.getElementById('e-name').value.trim();
   const skill    = document.getElementById('e-skill').value;
   const mobile   = document.getElementById('e-mobile').value.trim();
@@ -687,15 +728,16 @@ function enrollWorker() {
   if (!skill)  { showToast('Select a skill','error'); return; }
   if (!/^\d{10}$/.test(mobile)) { showToast('Enter valid 10-digit mobile','error'); return; }
 
-  const workers = getWorkers();
+  const workers = await getWorkers();
   if (workers.some(w => w.mobile===mobile) && !companion) {
     showToast('Mobile already registered. Check "Companion" to add another worker.','error');
     return;
   }
 
-  const worker = { id:generateWorkerId(), name, skill, mobile, isCompanion:companion, enrolled:today() };
+  const newId = await generateWorkerId();
+  const worker = { id:newId, name, skill, mobile, isCompanion:companion, enrolled:today() };
   workers.push(worker);
-  saveWorkers(workers);
+  await saveWorkers(workers);
 
   document.getElementById('result-id').textContent = worker.id;
   document.getElementById('result-name').textContent = name + ' · ' + skill;
@@ -710,23 +752,26 @@ function enrollWorker() {
 // ══════════════════════════════════════════════════════════
 // ATTENDANCE
 // ══════════════════════════════════════════════════════════
-function lookupWorker() {
+async function lookupWorker() {
   const id   = document.getElementById('a-id').value.trim();
   const info = document.getElementById('worker-info');
   if (id.length!==7) { info.classList.remove('show'); return; }
-  const w = getWorkers().find(x => x.id===id);
+  const workers = await getWorkers();
+  const w = workers.find(x => x.id===id);
   if (!w) { info.classList.remove('show'); return; }
-  const rec = getAttendance().find(a => a.workerId===id && a.date===today() && !a.outTime);
+  const att = await getAttendance();
+  const rec = att.find(a => a.workerId===id && a.date===today() && !a.outTime);
   const status = rec ? '🟡 IN since '+rec.inTime : '⚪ Not marked IN today';
   document.getElementById('wi-name').textContent = w.name;
   document.getElementById('wi-detail').textContent = w.skill+' · ID: '+w.id+' · '+status;
   info.classList.add('show');
 }
 
-function _attendId() {
+async function _attendId() {
   const id = document.getElementById('a-id').value.trim();
   if (id.length!==7) { showToast('Enter 7-digit Worker ID','error'); return null; }
-  if (!getWorkers().find(x => x.id===id)) { showToast('Worker not found','error'); return null; }
+  const workers = await getWorkers();
+  if (!workers.find(x => x.id===id)) { showToast('Worker not found','error'); return null; }
   return id;
 }
 
@@ -742,31 +787,31 @@ function _getScanner() {
   } catch(e) { return null; }
 }
 
-function markIN() {
-  const id = _attendId(); if (!id) return;
-  const att = getAttendance();
+async function markIN() {
+  const id = await _attendId(); if (!id) return;
+  const att = await getAttendance();
   const open = att.find(a => a.workerId===id && a.date===today() && !a.outTime);
   if (open) { showToast('Already IN at '+open.inTime+'. Mark OUT first.','error'); return; }
   const rec = { workerId:id, date:today(), inTime:nowTime(), outTime:null };
   const scanner = _getScanner();
   if (scanner) rec.scannedInBy = scanner;
   att.push(rec);
-  saveAttendance(att);
+  await saveAttendance(att);
   showToast('IN marked at '+nowTime(),'success');
-  lookupWorker();
+  await lookupWorker();
 }
 
-function markOUT() {
-  const id = _attendId(); if (!id) return;
-  const att = getAttendance();
+async function markOUT() {
+  const id = await _attendId(); if (!id) return;
+  const att = await getAttendance();
   const idx = att.findIndex(a => a.workerId===id && a.date===today() && !a.outTime);
   if (idx===-1) { showToast('Not marked IN today. Mark IN first.','error'); return; }
   att[idx].outTime = nowTime();
   const scanner = _getScanner();
   if (scanner) att[idx].scannedOutBy = scanner;
-  saveAttendance(att);
+  await saveAttendance(att);
   showToast('OUT marked at '+nowTime(),'success');
-  lookupWorker();
+  await lookupWorker();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -774,14 +819,14 @@ function markOUT() {
 // ══════════════════════════════════════════════════════════
 let currentRType = 'daily';
 
-function setRType(type, btn) {
+async function setRType(type, btn) {
   currentRType = type;
   document.querySelectorAll('.rtype-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  initReport();
+  await initReport();
 }
 
-function initReport() {
+async function initReport() {
   const ctrl = document.getElementById('r-controls');
   const out  = document.getElementById('r-output');
   out.innerHTML = '';
@@ -793,7 +838,7 @@ function initReport() {
         <input type="date" id="r-date" value="${today()}"
                onchange="renderReport()" style="width:auto;margin:0;padding:10px 12px;font-size:15px">
       </div>`;
-    renderReport();
+    await renderReport();
 
   } else if (currentRType === 'weekly') {
     ctrl.innerHTML = `
@@ -802,7 +847,7 @@ function initReport() {
         <input type="date" id="r-week" value="${today()}"
                onchange="renderReport()" style="width:auto;margin:0;padding:10px 12px;font-size:15px">
       </div>`;
-    renderReport();
+    await renderReport();
 
   } else if (currentRType === 'monthly') {
     const ym = today().slice(0,7);
@@ -812,7 +857,7 @@ function initReport() {
         <input type="month" id="r-month" value="${ym}"
                onchange="renderReport()" style="width:auto;margin:0;padding:10px 12px;font-size:15px">
       </div>`;
-    renderReport();
+    await renderReport();
 
   } else if (currentRType === 'manhour') {
     ctrl.innerHTML = `
@@ -821,10 +866,11 @@ function initReport() {
         <input type="month" id="r-mh-month" value="${today().slice(0,7)}"
                onchange="renderReport()" style="width:auto;margin:0;padding:10px 12px;font-size:15px">
       </div>`;
-    renderReport();
+    await renderReport();
 
   } else if (currentRType === 'skillwise') {
-    const skillList = [...new Set(getWorkers().map(w=>w.skill))].sort();
+    const workers = await getWorkers();
+    const skillList = [...new Set(workers.map(w=>w.skill))].sort();
     ctrl.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <strong>Month:</strong>
@@ -841,41 +887,42 @@ function initReport() {
           ${skillList.map(s=>`<option value="${s}">${s}</option>`).join('')}
         </select>
       </div>`;
-    renderReport();
+    await renderReport();
   }
 }
 
-function renderReport() {
+async function renderReport() {
   const out = document.getElementById('r-output');
 
   if (currentRType === 'daily') {
     const date = document.getElementById('r-date').value || today();
-    renderDailyReport(date, out);
+    await renderDailyReport(date, out);
 
   } else if (currentRType === 'weekly') {
     const ref = document.getElementById('r-week').value || today();
-    renderWeeklyReport(getWeekDates(ref), out);
+    await renderWeeklyReport(getWeekDates(ref), out);
 
   } else if (currentRType === 'monthly') {
     const ym = document.getElementById('r-month').value || today().slice(0,7);
-    renderMonthlyReport(ym, out);
+    await renderMonthlyReport(ym, out);
 
   } else if (currentRType === 'manhour') {
     const ym = document.getElementById('r-mh-month').value || today().slice(0,7);
-    renderManhourReport(ym, out);
+    await renderManhourReport(ym, out);
 
   } else if (currentRType === 'skillwise') {
     const ym = document.getElementById('r-sw-month').value || today().slice(0,7);
-    renderSkillwiseReport(ym, out);
+    await renderSkillwiseReport(ym, out);
   }
 
   document.getElementById('r-print-bar').style.display = 'block';
 }
 
 // ── Daily ──
-function renderDailyReport(date, container) {
-  const workers = getWorkers();
-  const att = getAttendance().filter(a => a.date===date);
+async function renderDailyReport(date, container) {
+  const workers = await getWorkers();
+  const allAtt = await getAttendance();
+  const att = allAtt.filter(a => a.date===date);
   const totalW = workers.length;
   const presentW = att.length;
 
@@ -918,9 +965,9 @@ function renderDailyReport(date, container) {
 }
 
 // ── Weekly ──
-function renderWeeklyReport(dates, container) {
-  const workers = getWorkers();
-  const att = getAttendance();
+async function renderWeeklyReport(dates, container) {
+  const workers = await getWorkers();
+  const att = await getAttendance();
   const rows = workers.map(w => {
     let present=0, totalMins=0;
     const days = dates.map(d => {
@@ -990,10 +1037,10 @@ function renderWeeklyReport(dates, container) {
 }
 
 // ── Monthly ──
-function renderMonthlyReport(ym, container) {
-  const workers = getWorkers();
+async function renderMonthlyReport(ym, container) {
+  const workers = await getWorkers();
   const dates   = getMonthDates(ym);
-  const att     = getAttendance();
+  const att     = await getAttendance();
 
   const pastDates = dates.filter(d => !isFuture(d));
   const rows = workers.map(w => {
@@ -1055,10 +1102,10 @@ function renderMonthlyReport(ym, container) {
 }
 
 // ── Manhours by Skill ──
-function renderManhourReport(ym, container) {
-  const workers = getWorkers();
+async function renderManhourReport(ym, container) {
+  const workers = await getWorkers();
   const dates   = getMonthDates(ym);
-  const att     = getAttendance();
+  const att     = await getAttendance();
 
   const pastDates = dates.filter(d=>!isFuture(d));
   const skills = {};
@@ -1133,10 +1180,10 @@ function renderManhourReport(ym, container) {
 }
 
 // ── Skillwise Workers ──
-function renderSkillwiseReport(ym, container) {
-  const workers = getWorkers();
+async function renderSkillwiseReport(ym, container) {
+  const workers = await getWorkers();
   const dates   = getMonthDates(ym);
-  const att     = getAttendance();
+  const att     = await getAttendance();
 
   const pastDates = dates.filter(d=>!isFuture(d));
   const skills = {};
@@ -1246,9 +1293,10 @@ function printTabReport() {
 // ══════════════════════════════════════════════════════════
 // WORKERS TAB
 // ══════════════════════════════════════════════════════════
-function renderWorkers() {
+async function renderWorkers() {
   const q = (document.getElementById('w-search').value||'').toLowerCase();
-  const workers = getWorkers().filter(w =>
+  const allWorkers = await getWorkers();
+  const workers = allWorkers.filter(w =>
     w.name.toLowerCase().includes(q) || w.id.includes(q) || w.skill.toLowerCase().includes(q)
   );
   const list = document.getElementById('workers-list');
@@ -1286,10 +1334,11 @@ function renderWorkers() {
 let modalWorkerId = null;
 let modalPeriod   = 'weekly';
 
-function openWorkerModal(id) {
+async function openWorkerModal(id) {
   modalWorkerId = id;
   modalPeriod   = 'weekly';
-  const w = getWorkers().find(x=>x.id===id);
+  const workers = await getWorkers();
+  const w = workers.find(x=>x.id===id);
   if (!w) return;
   document.getElementById('modal-name').textContent   = w.name;
   document.getElementById('modal-detail').textContent = w.skill+' · ID: '+w.id+(w.isCompanion?' · Companion':'');
@@ -1332,11 +1381,12 @@ function renderModalControls() {
   renderModalReport();
 }
 
-function renderModalReport() {
+async function renderModalReport() {
   if (!modalWorkerId) return;
-  const w   = getWorkers().find(x=>x.id===modalWorkerId);
+  const workers = await getWorkers();
+  const w   = workers.find(x=>x.id===modalWorkerId);
   if (!w) return;
-  const att = getAttendance();
+  const att = await getAttendance();
 
   let dates;
   if (modalPeriod==='weekly') {
@@ -1404,9 +1454,10 @@ function renderModalReport() {
 // ══════════════════════════════════════════════════════════
 // PRINT / PDF
 // ══════════════════════════════════════════════════════════
-function printWorkerReport() {
+async function printWorkerReport() {
   if (!modalWorkerId) return;
-  const w = getWorkers().find(x=>x.id===modalWorkerId);
+  const workers = await getWorkers();
+  const w = workers.find(x=>x.id===modalWorkerId);
   if (!w) return;
 
   let periodLabel = '';
@@ -1439,112 +1490,66 @@ function printWorkerReport() {
 }
 
 // ══════════════════════════════════════════════════════════
-// SEED DATA (14 days, 11 workers including companions)
+// SUPABASE INIT / MIGRATION
 // ══════════════════════════════════════════════════════════
-function seedDemoData() {
-  if (localStorage.getItem('lms_seeded_v2')) return;
-  localStorage.removeItem('lms_workers');
-  localStorage.removeItem('lms_attendance');
+async function initSupabaseData() {
+  const workers = await getWorkers();
+  if (workers.length > 0) return; // Already has data
 
-  const workers = [
-    // ── Original workers ──
+  console.log('🔄 Initializing Supabase Data...');
+  
+  // Try to migrate from localStorage first
+  const localWorkers = JSON.parse(localStorage.getItem('lms_workers') || '[]');
+  const localAtt     = JSON.parse(localStorage.getItem('lms_attendance') || '[]');
+  
+  if (localWorkers.length > 0) {
+    console.log('📦 Migrating from localStorage...');
+    await saveWorkers(localWorkers);
+    await saveAttendance(localAtt);
+    showToast('Data migrated to Supabase','success');
+    return;
+  }
+
+  // Otherwise seed with demo data
+  console.log('🌱 Seeding demo data...');
+  const demoWorkers = [
     { id:'3812904', name:'Ramesh Kumar',   skill:'Mason',           mobile:'9876543210', isCompanion:false, enrolled:dateOffset(14) },
     { id:'4729183', name:'Suresh Yadav',   skill:'Electrician',     mobile:'9823456781', isCompanion:false, enrolled:dateOffset(14) },
     { id:'5631027', name:'Mahesh Singh',   skill:'Carpenter',       mobile:'9745612390', isCompanion:false, enrolled:dateOffset(14) },
     { id:'6204815', name:'Dinesh Verma',   skill:'Plumber',         mobile:'9667891234', isCompanion:false, enrolled:dateOffset(14) },
     { id:'7093462', name:'Ganesh Patel',   skill:'Helper / Labour', mobile:'9512378456', isCompanion:false, enrolled:dateOffset(14) },
-    // ── New independent workers ──
     { id:'2183746', name:'Vikram Sharma',  skill:'Welder',          mobile:'9334567890', isCompanion:false, enrolled:dateOffset(12) },
     { id:'8294651', name:'Raju Nair',      skill:'Painter',         mobile:'9445678901', isCompanion:false, enrolled:dateOffset(12) },
     { id:'9371824', name:'Anil Kumar',     skill:'Supervisor',      mobile:'9556789012', isCompanion:false, enrolled:dateOffset(12) },
     { id:'5739284', name:'Mohan Lal',      skill:'Helper / Labour', mobile:'9778901234', isCompanion:false, enrolled:dateOffset(12) },
-    // ── Companion workers ──
     { id:'1847392', name:'Santosh Yadav',  skill:'Electrician',     mobile:'9823456781', isCompanion:true,  enrolled:dateOffset(10) },
     { id:'3628475', name:'Kiran Patel',    skill:'Carpenter',       mobile:'9745612390', isCompanion:true,  enrolled:dateOffset(10) }
   ];
 
-  // 14-day schedule: index 0 = dateOffset(13), index 13 = today
-  // null = ABSENT | [inTime, outTime|null] = PRESENT
   const schedule = {
-    '3812904': [ // Ramesh — Mason — absent idx 3,7,12
-      ['08:15','17:00'],['08:20','17:10'],['08:10','16:55'], null,
-      ['08:30','17:15'],['08:00','16:45'],['08:25','17:05'], null,
-      ['08:10','17:00'],['08:30','16:50'],['08:15','17:10'],['08:00','16:55'],
-       null,            ['08:15',null]
-    ],
-    '4729183': [ // Suresh — Electrician — absent idx 1,5,10
-      ['08:30','16:45'], null,            ['08:40','17:00'],['08:35','16:50'],
-      ['08:25','17:10'], null,            ['08:50','16:40'],['08:30','17:05'],
-      ['08:20','16:55'],['08:45','17:00'], null,            ['08:30','16:50'],
-      ['08:15','17:10'],['08:30','17:00']
-    ],
-    '5631027': [ // Mahesh — Carpenter — absent idx 0,6,11
-       null,            ['09:00','17:30'],['09:10','17:20'],['08:55','17:15'],
-      ['09:05','17:25'],['08:50','17:00'], null,            ['09:00','17:30'],
-      ['08:50','17:10'],['09:15','17:00'],['09:00','17:20'], null,
-      ['09:05','17:15'],['09:00',null]
-    ],
-    '6204815': [ // Dinesh — Plumber — absent idx 2,4,9
-      ['08:45','17:00'],['08:50','16:55'], null,            ['08:40','17:05'],
-       null,            ['08:55','17:10'],['08:45','17:00'],['08:30','16:50'],
-      ['08:40','17:05'], null,            ['08:50','17:00'],['08:45','16:55'],
-      ['08:30','17:10'],['08:45',null]
-    ],
-    '7093462': [ // Ganesh — Helper — absent idx 3,8,13
-      ['09:15','15:30'],['09:20','15:45'],['09:10','16:00'], null,
-      ['09:25','15:30'],['09:00','16:10'],['09:15','15:45'],['09:20','15:30'],
-       null,            ['09:10','16:00'],['09:15','15:45'],['09:05','16:00'],
-      ['09:20','15:30'], null
-    ],
-    '2183746': [ // Vikram — Welder — absent idx 1,6,10
-      ['08:00','17:30'], null,            ['08:10','17:20'],['08:05','17:15'],
-      ['07:55','17:30'],['08:00','17:00'], null,            ['08:10','17:25'],
-      ['08:00','17:30'],['07:50','17:20'], null,            ['08:00','17:30'],
-      ['08:05','17:15'],['08:00',null]
-    ],
-    '8294651': [ // Raju — Painter — absent idx 0,4,9,13
-       null,            ['08:30','16:00'],['08:45','16:10'],['08:30','16:00'],
-       null,            ['08:40','16:05'],['08:30','16:00'],['08:45','16:15'],
-      ['08:30','16:00'], null,            ['08:35','16:05'],['08:30','16:00'],
-      ['08:45','16:10'], null
-    ],
-    '9371824': [ // Anil — Supervisor — absent idx 7,12
-      ['07:30','18:00'],['07:35','18:10'],['07:30','18:00'],['07:40','17:50'],
-      ['07:30','18:00'],['07:35','17:55'],['07:30','18:00'], null,
-      ['07:30','18:00'],['07:35','18:05'],['07:30','18:00'],['07:40','17:50'],
-       null,            ['07:30','18:00']
-    ],
-    '5739284': [ // Mohan — Helper — absent idx 2,5,8,11
-      ['09:30','15:00'],['09:20','15:10'], null,            ['09:25','15:05'],
-      ['09:30','15:00'], null,            ['09:15','15:00'],['09:30','15:05'],
-       null,            ['09:20','15:00'],['09:30','15:10'], null,
-      ['09:25','15:05'],['09:30',null]
-    ],
-    '1847392': [ // Santosh — Electrician companion — absent idx 3,6,10
-      ['08:30','16:45'],['08:35','17:00'],['08:40','16:50'], null,
-      ['08:30','17:05'],['08:45','16:55'], null,            ['08:30','17:00'],
-      ['08:35','16:50'],['08:40','17:00'], null,            ['08:30','17:05'],
-      ['08:45','16:45'],['08:30',null]
-    ],
-    '3628475': [ // Kiran — Carpenter companion — absent idx 1,7,13
-      ['09:05','17:20'], null,            ['09:00','17:15'],['09:10','17:25'],
-      ['09:05','17:20'],['09:00','17:10'],['09:05','17:25'], null,
-      ['09:00','17:20'],['09:05','17:15'],['09:00','17:25'],['09:10','17:20'],
-      ['09:05','17:10'], null
-    ]
+    '3812904': [['08:15','17:00'],['08:20','17:10'],['08:10','16:55'],null,['08:30','17:15'],['08:00','16:45'],['08:25','17:05'],null,['08:10','17:00'],['08:30','16:50'],['08:15','17:10'],['08:00','16:55'],null,['08:15',null]],
+    '4729183': [['08:30','16:45'],null,['08:40','17:00'],['08:35','16:50'],['08:25','17:10'],null,['08:50','16:40'],['08:30','17:05'],['08:20','16:55'],['08:45','17:00'],null,['08:30','16:50'],['08:15','17:10'],['08:30','17:00']],
+    '5631027': [null,['09:00','17:30'],['09:10','17:20'],['08:55','17:15'],['09:05','17:25'],['08:50','17:00'],null,['09:00','17:30'],['08:50','17:10'],['09:15','17:00'],['09:00','17:20'],null,['09:05','17:15'],['09:00',null]],
+    '6204815': [['08:45','17:00'],['08:50','16:55'],null,['08:40','17:05'],null,['08:55','17:10'],['08:45','17:00'],['08:30','16:50'],['08:40','17:05'],null,['08:50','17:00'],['08:45','16:55'],['08:30','17:10'],['08:45',null]],
+    '7093462': [['09:15','15:30'],['09:20','15:45'],['09:10','16:00'],null,['09:25','15:30'],['09:00','16:10'],['09:15','15:45'],['09:20','15:30'],null,['09:10','16:00'],['09:15','15:45'],['09:05','16:00'],['09:20','15:30'],null],
+    '2183746': [['08:00','17:30'],null,['08:10','17:20'],['08:05','17:15'],['07:55','17:30'],['08:00','17:00'],null,['08:10','17:25'],['08:00','17:30'],['07:50','17:20'],null,['08:00','17:30'],['08:05','17:15'],['08:00',null]],
+    '8294651': [null,['08:30','16:00'],['08:45','16:10'],['08:30','16:00'],null,['08:40','16:05'],['08:30','16:00'],['08:45','16:15'],['08:30','16:00'],null,['08:35','16:05'],['08:30','16:00'],['08:45','16:10'],null],
+    '9371824': [['07:30','18:00'],['07:35','18:10'],['07:30','18:00'],['07:40','17:50'],['07:30','18:00'],['07:35','17:55'],['07:30','18:00'],null,['07:30','18:00'],['07:35','18:05'],['07:30','18:00'],['07:40','17:50'],null,['07:30','18:00']],
+    '5739284': [['09:30','15:00'],['09:20','15:10'],null,['09:25','15:05'],['09:30','15:00'],null,['09:15','15:00'],['09:30','15:05'],null,['09:20','15:00'],['09:30','15:10'],null,['09:25','15:05'],['09:30',null]],
+    '1847392': [['08:30','16:45'],['08:35','17:00'],['08:40','16:50'],null,['08:30','17:05'],['08:45','16:55'],null,['08:30','17:00'],['08:35','16:50'],['08:40','17:00'],null,['08:30','17:05'],['08:45','16:45'],['08:30',null]],
+    '3628475': [['09:05','17:20'],null,['09:00','17:15'],['09:10','17:25'],['09:05','17:20'],['09:00','17:10'],['09:05','17:25'],null,['09:00','17:20'],['09:05','17:15'],['09:00','17:25'],['09:10','17:20'],['09:05','17:10'],null]
   };
 
-  const attendance = [];
+  const demoAttendance = [];
   Object.entries(schedule).forEach(([workerId, days]) => {
     days.forEach((entry, i) => {
       if (!entry) return;
-      attendance.push({ workerId, date:dateOffset(13-i), inTime:entry[0], outTime:entry[1] });
+      demoAttendance.push({ workerId, date:dateOffset(13-i), inTime:entry[0], outTime:entry[1] });
     });
   });
 
-  saveWorkers(workers);
-  saveAttendance(attendance);
-  localStorage.setItem('lms_seeded_v2', '1');
+  await saveWorkers(demoWorkers);
+  await saveAttendance(demoAttendance);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1624,11 +1629,11 @@ function scanLoop() {
   qrAnimFrame = requestAnimationFrame(scanLoop);
 }
 
-function onQRDetected(data) {
+async function onQRDetected(data) {
   closeQRScanner();
 
   if (qrMode === 'link') {
-    const workers = getWorkers();
+    const workers = await getWorkers();
     // Check if QR already used by a different worker
     const existing = workers.find(w => w.qrCode === data && w.id !== qrLinkTargetId);
     if (existing) {
@@ -1638,28 +1643,31 @@ function onQRDetected(data) {
     const idx = workers.findIndex(w => w.id === qrLinkTargetId);
     if (idx === -1) { showToast('Worker not found', 'error'); return; }
     workers[idx].qrCode = data;
-    saveWorkers(workers);
+    await saveWorkers(workers);
     showToast('✅ QR linked to ' + workers[idx].name, 'success');
-    renderWorkers();
+    await renderWorkers();
 
   } else if (qrMode === 'attend') {
-    const worker = getWorkers().find(w => w.qrCode === data);
+    const workers = await getWorkers();
+    const worker = workers.find(w => w.qrCode === data);
     if (!worker) {
       showToast('QR not linked yet. Go to Workers tab → Link QR first.', 'error');
       return;
     }
     // Auto-fill ID and show worker info
     document.getElementById('a-id').value = worker.id;
-    lookupWorker();
+    await lookupWorker();
     showToast('👷 ' + worker.name + ' — tap IN or OUT', 'success');
   }
 }
 
 // ══════════════════════════════════════════════════════════
-// INIT
+// INIT (Startup sequence)
 // ══════════════════════════════════════════════════════════
-seedDemoData();
-initReport();
+(async function init() {
+  await initSupabaseData();
+  await initReport();
+})();
 
 setInterval(() => {
   if (document.getElementById('sec-report').classList.contains('active')) renderReport();

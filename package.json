@@ -1,0 +1,8 @@
+{
+  "name": "patel-infrastructure-site-suite",
+  "version": "1.0.0",
+  "description": "Site Management Suite for Patel Infrastructure",
+  "scripts": {
+    "local": "npx serve ."
+  }
+}

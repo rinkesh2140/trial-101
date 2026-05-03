@@ -1,123 +1,178 @@
 // ══════════════════════════════════════════════════════════
-// FIREBASE INIT
+// SUPABASE INIT
 // ══════════════════════════════════════════════════════════
-const firebaseConfig = {
-  apiKey: "AIzaSyANUaV2m5MCWCpZCMIZbMFIh-9_v-eg0_o",
-  authDomain: "trial-101-d39b1.firebaseapp.com",
-  projectId: "trial-101-d39b1",
-  storageBucket: "trial-101-d39b1.firebasestorage.app",
-  messagingSenderId: "361024620179",
-  appId: "1:361024620179:web:36ed5f6be89e2cf9d96f66"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const SUPABASE_URL = "https://yzevducedcvxvugozmbu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_sFuIGiOOco0RjlCVGG5C6Q_2VDCou5C";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// In-memory cache (Firestore data loaded here on startup)
+// In-memory cache (Supabase data loaded here on startup)
 const DB = {
   employees:[], users:[], attendance:[], availability:[],
   tasks:[], notes:[], messages:[], contacts:[], groups:[],
-  lmsWorkers:[], lmsAtt:[], pad:{}, punchRequests:[], seeded:false
+  lmsWorkers:[], lmsAtt:[], pad:{}, punchRequests:[], sites:[], companies:[], announcements:[], employee_sites:[], seeded:false
 };
 
-// Low-level Firestore helpers (fire-and-forget writes)
-function fbSet(col, id, data) { db.collection(col).doc(id).set(data).catch(e=>{ console.error('fbSet failed:',col,id,e); showToast('Save failed: '+e.code,'error'); }); }
-function fbDel(col, id)       { db.collection(col).doc(id).delete().catch(console.error); }
+// Low-level Supabase helpers (Async writes)
+async function sbUpsert(table, data) {
+  const sess = getSession();
+  const arr = Array.isArray(data) ? data : [data];
+  if (sess && table !== 'companies') {
+    arr.forEach(item => {
+      if (!item.company_id) item.company_id = sess.companyId;
+      if (table !== 'sites' && table !== 'employee_sites' && table !== 'users') {
+        if (!item.site_id && sess.activeSiteId && sess.role !== 'SU' && sess.role !== 'PM') {
+          item.site_id = sess.activeSiteId;
+        }
+      }
+    });
+  }
 
-// Batch upsert helper (handles >500 docs by chunking)
-function fbBatchSet(col, docs, idFn) {
-  const chunks = [];
-  for (let i = 0; i < docs.length; i += 499) chunks.push(docs.slice(i, i+499));
-  chunks.forEach(chunk => {
-    const batch = db.batch();
-    chunk.forEach(doc => batch.set(db.collection(col).doc(idFn(doc)), doc));
-    batch.commit().catch(console.error);
-  });
+  const { error } = await supabaseClient.from(table).upsert(arr);
+  if (error) {
+    console.error('sbUpsert failed:', table, error);
+    showToast('Save failed: ' + error.message, 'error');
+    throw error;
+  }
 }
 
-async function loadAllFromFirestore() {
-  const [emps,users,att,avail,tasks,notes,msgs,contacts,groups,lmsW,lmsA,padDocs,punchReqs,meta] = await Promise.all([
-    db.collection('employees').get(),
-    db.collection('users').get(),
-    db.collection('attendance').get(),
-    db.collection('availability').get(),
-    db.collection('tasks').get(),
-    db.collection('notes').get(),
-    db.collection('messages').get(),
-    db.collection('contacts').get(),
-    db.collection('groups').get(),
-    db.collection('lms_workers').get(),
-    db.collection('lms_attendance').get(),
-    db.collection('pad').get(),
-    db.collection('punch_requests').get(),
-    db.collection('meta').doc('config').get()
-  ]);
-  DB.employees      = emps.docs.map(d=>d.data());
-  DB.users          = users.docs.map(d=>d.data());
-  DB.attendance     = att.docs.map(d=>d.data());
-  DB.availability   = avail.docs.map(d=>d.data());
-  DB.tasks          = tasks.docs.map(d=>d.data());
-  DB.notes          = notes.docs.map(d=>d.data());
-  DB.messages       = msgs.docs.map(d=>d.data());
-  DB.contacts       = contacts.docs.map(d=>d.data());
-  DB.groups         = groups.docs.map(d=>d.data());
-  DB.lmsWorkers     = lmsW.docs.map(d=>d.data());
-  DB.lmsAtt         = lmsA.docs.map(d=>d.data());
-  DB.punchRequests  = punchReqs.docs.map(d=>d.data());
-  DB.pad            = {};
-  padDocs.docs.forEach(d=>{ const item=d.data(); if(!DB.pad[item.userId]) DB.pad[item.userId]=[]; DB.pad[item.userId].push(item); });
-  DB.seeded         = meta.exists ? !!(meta.data().seeded) : false;
+async function sbDel(table, conditions) {
+  const { error } = await supabaseClient.from(table).delete().match(conditions);
+  if (error) {
+    console.error('sbDel failed:', table, error);
+    showToast('Delete failed: ' + error.message, 'error');
+    throw error;
+  }
+}
+
+async function loadAllFromSupabase(companyId, role) {
+  console.log('Fetching data from Supabase for company:', companyId);
+  try {
+    const tables = [
+      'employees', 'users', 'attendance', 'availability', 'tasks', 'notes',
+      'messages', 'contacts', 'groups', 'lms_workers', 'lms_attendance',
+      'pad', 'punch_requests', 'sites', 'companies', 'announcements', 'employee_sites'
+    ];
+
+    const results = await Promise.all(tables.map(table => {
+      let query = supabaseClient.from(table).select('*');
+      if (role !== 'SU' && table !== 'companies' && table !== 'employee_sites') {
+        query = query.eq('company_id', companyId);
+      }
+      return query.then(res => {
+        console.log(`Fetched table: ${table}`, res.error ? 'ERROR' : 'SUCCESS');
+        return res;
+      });
+    }));
+
+    let metaRes = { data: null, error: null };
+    try {
+      metaRes = await supabaseClient.from('meta').select('*').eq('key', 'config').single();
+    } catch(e) {
+      console.log('No meta config found or error fetching it');
+    }
+    console.log('Fetched meta config', metaRes.error ? 'MISSING' : 'SUCCESS');
+
+    DB.employees     = results[0].data || [];
+    DB.users         = results[1].data || [];
+    DB.attendance    = results[2].data || [];
+    DB.availability  = results[3].data || [];
+    DB.tasks         = results[4].data || [];
+    DB.notes         = results[5].data || [];
+    DB.messages      = results[6].data || [];
+    DB.contacts      = results[7].data || [];
+    DB.groups        = results[8].data || [];
+    DB.lmsWorkers    = results[9].data || [];
+    DB.lmsAtt        = results[10].data || [];
+    const padDocs    = results[11].data || [];
+    DB.punchRequests = results[12].data || [];
+    DB.sites         = results[13].data || [];
+    DB.companies     = results[14].data || [];
+    DB.announcements = results[15].data || [];
+    DB.employee_sites= results[16].data || [];
+
+    DB.pad = {};
+    padDocs.forEach(item => { if (!DB.pad[item.userId]) DB.pad[item.userId] = []; DB.pad[item.userId].push(item); });
+    DB.seeded = metaRes.data ? !!(metaRes.data.seeded) : false;
+
+    console.log('DB Cache initialized. Employee count:', DB.employees.length);
+  } catch (err) {
+    console.error('Critical failure in loadAllFromSupabase:', err);
+  }
 }
 
 // Real-time message listener — updates chat live
-function startMessageListener() {
+function startSupabaseListeners() {
   // Real-time: messages
-  db.collection('messages').onSnapshot(snap => {
-    DB.messages = snap.docs.map(d=>d.data());
-    updateMsgBadge();
-    try { renderConvList(); } catch(e){}
-    try { if(waChatGroup) renderWAGroupThread(); else if(waChatWith) renderWAChatThread(); } catch(e){}
-  });
+  supabaseClient.channel('messages-all')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, payload => {
+      if (payload.eventType === 'INSERT') DB.messages.push(payload.new);
+      if (payload.eventType === 'UPDATE') { const idx = DB.messages.findIndex(m => m.id === payload.new.id); if (idx > -1) DB.messages[idx] = payload.new; }
+      if (payload.eventType === 'DELETE') { DB.messages = DB.messages.filter(m => m.id === payload.old.id); }
+      updateMsgBadge();
+      try { renderConvList(); } catch(e){}
+      try { if (waChatGroup) renderWAGroupThread(); else if (waChatWith) renderWAChatThread(); } catch(e){}
+    })
+    .subscribe();
 
-  // Real-time: availability (leave/on-site/wfh changes show instantly for all users)
-  db.collection('availability').onSnapshot(snap => {
-    DB.availability = snap.docs.map(d=>d.data());
-    try { const s = document.querySelector('#sec-schedule.active'); if(s) renderSchedule(); } catch(e){}
-    try { const s = document.querySelector('#sec-dashboard.active'); if(s) renderDashboard(); } catch(e){}
-  });
+  // Real-time: availability
+  supabaseClient.channel('avail-all')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'availability' }, payload => {
+      const updated = payload.new;
+      const idx = DB.availability.findIndex(a => a.employeeId === updated.employeeId && a.date === updated.date);
+      if (idx > -1) DB.availability[idx] = updated; else DB.availability.push(updated);
+      try { const s = document.querySelector('#sec-schedule.active'); if(s) renderSchedule(); } catch(e){}
+      try { const s = document.querySelector('#sec-dashboard.active'); if(s) renderDashboard(); } catch(e){}
+    })
+    .subscribe();
 
-  // Real-time: attendance (punch IN/OUT visible to all instantly)
-  db.collection('attendance').onSnapshot(snap => {
-    DB.attendance = snap.docs.map(d=>d.data());
-    try { const s = document.querySelector('#sec-dashboard.active'); if(s) renderDashboard(); } catch(e){}
-    try { const s = document.querySelector('#sec-people.active');    if(s) renderPeople();   } catch(e){}
-    try { const s = document.querySelector('#sec-schedule.active');  if(s) renderSchedule(); } catch(e){}
-  });
+  // Real-time: attendance
+  supabaseClient.channel('att-all')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, payload => {
+      const updated = payload.new;
+      const idx = DB.attendance.findIndex(a => a.employeeId === updated.employeeId && a.date === updated.date);
+      if (idx > -1) DB.attendance[idx] = updated; else DB.attendance.push(updated);
+      try { const s = document.querySelector('#sec-dashboard.active'); if(s) renderDashboard(); } catch(e){}
+      try { const s = document.querySelector('#sec-people.active');    if(s) renderPeople();   } catch(e){}
+      try { const s = document.querySelector('#sec-schedule.active');  if(s) renderSchedule(); } catch(e){}
+    })
+    .subscribe();
 
-  // Auto-refresh all data every 60 seconds as fallback
-  setInterval(async () => {
-    try {
-      const [att, avail, tasks] = await Promise.all([
-        db.collection('attendance').get(),
-        db.collection('availability').get(),
-        db.collection('tasks').get()
-      ]);
-      DB.attendance   = att.docs.map(d=>d.data());
-      DB.availability = avail.docs.map(d=>d.data());
-      DB.tasks        = tasks.docs.map(d=>d.data());
-      // Re-render active tab silently
-      const activeTab = document.querySelector('#app-shell section.active')?.id?.replace('sec-','');
-      if (activeTab) {
-        const renders = { dashboard:renderDashboard, people:renderPeople, schedule:renderSchedule, work:renderWork };
-        try { if(renders[activeTab]) renders[activeTab](); } catch(e){}
+  // Real-time: tasks
+  supabaseClient.channel('tasks-all')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
+      if (payload.eventType === 'DELETE') {
+        DB.tasks = DB.tasks.filter(t => t.id !== payload.old.id);
+      } else {
+        const updated = payload.new;
+        const idx = DB.tasks.findIndex(t => t.id === updated.id);
+        if (idx > -1) DB.tasks[idx] = updated; else DB.tasks.push(updated);
       }
-    } catch(e) { console.warn('Auto-refresh failed:', e); }
-  }, 60000);
+      try { const s = document.querySelector('#sec-tasks.active'); if(s) renderTasks(); } catch(e){}
+      try { const s = document.querySelector('#sec-dashboard.active'); if(s) renderDashboard(); } catch(e){}
+    })
+    .subscribe();
+
+  // Real-time: groups (chat)
+  supabaseClient.channel('groups-all')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, payload => {
+      const updated = payload.new;
+      const idx = DB.groups.findIndex(g => g.id === updated.id);
+      if (idx > -1) DB.groups[idx] = updated; else DB.groups.push(updated);
+      try { renderConvList(); } catch(e){}
+    })
+    .subscribe();
 }
+
+// Alias for legacy calls
+const startMessageListener = startSupabaseListeners;
+
+
 
 // ══════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════
 const ROLES = {
+  SU: { label:'Super Admin',         level:0 },
   PM: { label:'Project Manager',     level:1 },
   SM: { label:'Site Manager',        level:2 },
   HR: { label:'HR Manager',          level:3 },
@@ -129,12 +184,13 @@ const ROLES = {
   TK: { label:'Timekeeper',          level:9 }
 };
 
-const ALL_ROLES = ['PM','SM','HR','SE','EN','SV','JE','AS','TK'];
+const ALL_ROLES = ['SU','PM','SM','HR','SE','EN','SV','JE','AS','TK'];
 const TAB_ACCESS = {
   dashboard: ALL_ROLES,
   work:      ['PM','SM','HR','SE','EN','SV','JE','AS'],
   messages:  ALL_ROLES,
   people:    ALL_ROLES,
+  admin:     ['SU'],
   more:      ALL_ROLES,
   // sub-tabs of More (not in nav, accessed via More hub)
   schedule:  ALL_ROLES,
@@ -144,14 +200,14 @@ const TAB_ACCESS = {
 };
 
 const MORE_SUB_TABS = ['schedule','mypad','reports','profile'];
-const NAV_TABS      = ['work','people','dashboard','messages','more'];
+const NAV_TABS      = ['work','people','dashboard','messages','admin','more'];
 
 const TAB_LABELS = {
-  dashboard: 'Home', work: 'Work', messages: 'Chat', people: 'Crew', more: 'More',
+  dashboard: 'Home', work: 'Work', messages: 'Chat', people: 'Crew', admin: 'Admin', more: 'More',
   schedule: 'Schedule', mypad: 'My Pad', reports: 'Reports', profile: 'Profile'
 };
 const TAB_ICONS = {
-  dashboard: '🏠', work: '✅', messages: '💬', people: '👷', more: '☰',
+  dashboard: '🏠', work: '✅', messages: '💬', people: '👷', admin: '⚙️', more: '☰',
   schedule: '📅', mypad: '📝', reports: '📊', profile: '👤'
 };
 
@@ -208,31 +264,44 @@ const AVAIL = {
 // ══════════════════════════════════════════════════════════
 // STORAGE — backed by Firestore (in-memory cache for sync reads)
 // ══════════════════════════════════════════════════════════
-const getEmployees  = () => DB.employees;
-const getUsers      = () => DB.users;
-const getSupAtt     = () => DB.attendance;
-const getAvailList  = () => DB.availability;
-const getTasks      = () => DB.tasks;
-const getNotes      = () => DB.notes;
-const getLmsWorkers = () => DB.lmsWorkers;
-const getLmsAtt     = () => DB.lmsAtt;
-const getMessages   = () => DB.messages;
-const getContacts   = () => DB.contacts;
-const getGroups     = () => DB.groups;
+const filterBySite = (list) => {
+  const siteId = getActiveSiteId();
+  const sess = getSession();
+  if (!siteId || (sess && (sess.role === 'SU' || sess.role === 'PM'))) return list;
+  return list.filter(item => !item.site_id || item.site_id === siteId);
+};
 
-const saveEmployees  = d => { DB.employees   = d; fbBatchSet('employees',  d, e=>e.id); };
-const saveUsers      = d => { DB.users       = d; fbBatchSet('users',      d, u=>u.username); };
-const saveSupAtt     = d => { DB.attendance  = d; fbBatchSet('attendance', d, a=>a.employeeId+'_'+a.date); };
-const saveAvailList  = d => { DB.availability= d; fbBatchSet('availability',d, a=>a.employeeId+'_'+a.date); };
-const saveTasks      = d => { DB.tasks       = d; fbBatchSet('tasks',      d, t=>t.id); };
-const saveNotes      = d => { DB.notes       = d; fbBatchSet('notes',      d, n=>n.id); };
-const saveMessages   = d => { DB.messages    = d; fbBatchSet('messages',   d, m=>m.id); };
-const saveContacts   = d => { DB.contacts    = d; fbBatchSet('contacts',   d, c=>c.id); };
-const saveGroups     = d => { DB.groups      = d; fbBatchSet('groups',     d, g=>g.id); };
-const saveLmsWorkers = d => { DB.lmsWorkers  = d; fbBatchSet('lms_workers',d, w=>w.id); };
-const saveLmsAtt        = d => { DB.lmsAtt         = d; fbBatchSet('lms_attendance',  d, a=>a.workerId+'_'+a.date); };
-const getPunchRequests  = () => DB.punchRequests;
-const savePunchRequests = d => { DB.punchRequests  = d; fbBatchSet('punch_requests',  d, r=>r.id); };
+const getEmployees  = () => {
+  const siteId = getActiveSiteId();
+  const sess = getSession();
+  if (!siteId || (sess && (sess.role === 'SU' || sess.role === 'PM'))) return DB.employees;
+  const siteEmpIds = (DB.employee_sites||[]).filter(es => es.site_id === siteId).map(es => es.employee_id);
+  return DB.employees.filter(e => siteEmpIds.includes(e.id));
+};
+const getUsers      = () => DB.users;
+const getSupAtt     = () => filterBySite(DB.attendance);
+const getAvailList  = () => filterBySite(DB.availability);
+const getTasks      = () => filterBySite(DB.tasks);
+const getNotes      = () => filterBySite(DB.notes);
+const getLmsWorkers = () => filterBySite(DB.lmsWorkers);
+const getLmsAtt     = () => filterBySite(DB.lmsAtt);
+const getMessages   = () => filterBySite(DB.messages);
+const getContacts   = () => filterBySite(DB.contacts);
+const getGroups     = () => filterBySite(DB.groups);
+
+const saveEmployees  = async d => { DB.employees   = d; await sbUpsert('employees',  d); };
+const saveUsers      = async d => { DB.users       = d; await sbUpsert('users',      d); };
+const saveSupAtt     = async d => { DB.attendance  = d; await sbUpsert('attendance', d); };
+const saveAvailList  = async d => { DB.availability= d; await sbUpsert('availability',d); };
+const saveTasks      = async d => { DB.tasks       = d; await sbUpsert('tasks',      d); };
+const saveNotes      = async d => { DB.notes       = d; await sbUpsert('notes',      d); };
+const saveLmsWorkers = async d => { DB.lmsWorkers  = d; await sbUpsert('lms_workers', d); };
+const saveLmsAtt     = async d => { DB.lmsAtt      = d; await sbUpsert('lms_attendance',d); };
+const saveMessages   = async d => { DB.messages    = d; await sbUpsert('messages',   d); };
+const saveContacts   = async d => { DB.contacts    = d; await sbUpsert('contacts',   d); };
+const saveGroups     = async d => { DB.groups      = d; await sbUpsert('groups',     d); };
+const getPunchRequests  = () => filterBySite(DB.punchRequests);
+const savePunchRequests = async d => { DB.punchRequests = d; await sbUpsert('punch_requests', d); };
 
 // ══════════════════════════════════════════════════════════
 // DATE HELPERS
@@ -335,9 +404,13 @@ function computeTotalExp(joinDate, priorExpYears) {
 // ── Permission checks ──
 // Returns list of roles that sessionRole can change TO for target employee
 function allowedRoleTargets(sessionRole, targetCurrentRole) {
+  // SU can change ANYONE to ANY ROLE except SU
+  if (sessionRole === 'SU') {
+    return Object.keys(ROLES).filter(r => r !== 'SU');
+  }
   // PM can change anyone except themselves (PM->PM meaningless)
   if (sessionRole === 'PM') {
-    return Object.keys(ROLES).filter(r => r !== 'PM');
+    return Object.keys(ROLES).filter(r => !['PM','SU'].includes(r));
   }
   // SM can change SE/EN/SV/JE/AS/TK (not PM/SM/HR)
   if (sessionRole === 'SM') {
@@ -355,7 +428,8 @@ function allowedRoleTargets(sessionRole, targetCurrentRole) {
 }
 
 function canResignEmp(sessionRole, targetCurrentRole) {
-  if (sessionRole === 'PM') return targetCurrentRole !== 'PM';
+  if (sessionRole === 'SU') return true;
+  if (sessionRole === 'PM') return !['PM','SU'].includes(targetCurrentRole);
   if (sessionRole === 'SM') return !['PM','SM','HR'].includes(targetCurrentRole);
   if (sessionRole === 'HR') {
     const hrEmp = getCurrentEmp();
@@ -365,7 +439,7 @@ function canResignEmp(sessionRole, targetCurrentRole) {
 }
 
 // ── Role change ──
-function changeEmpRole(empId) {
+async function changeEmpRole(empId) {
   const selEl = document.getElementById('role-change-sel-' + empId);
   if (!selEl) return;
   const newRole = selEl.value;
@@ -376,10 +450,10 @@ function changeEmpRole(empId) {
   if (allowedRoleTargets(sess.role, emp.role).length === 0) { showToast('Not authorised','error'); return; }
   emp.role        = newRole;
   emp.designation = ROLES[newRole]?.label || newRole;
-  saveEmployees(emps);
+  await saveEmployees(emps);
   const users = getUsers();
   const u = users.find(x => x.employeeId === empId);
-  if (u) { u.role = newRole; saveUsers(users); }
+  if (u) { u.role = newRole; await saveUsers(users); }
   showToast('Role changed to ' + (ROLES[newRole]?.label || newRole), 'success');
   openEmpProfile(empId);
 }
@@ -451,8 +525,12 @@ function getMonthDates(ym) {
 let _tt;
 function showToast(msg, type='info') {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show '+type;
-  clearTimeout(_tt); _tt = setTimeout(()=>t.className='', 3000);
+  if (!t) return;
+  t.textContent = msg;
+  t.className = type; // success | error | warning | info
+  t.style.display = 'block';
+  clearTimeout(_tt);
+  _tt = setTimeout(() => { t.style.display = 'none'; t.className = ''; }, 3200);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -465,22 +543,81 @@ function overlayClose(e, id) { if(e.target===document.getElementById(id)) closeM
 // ══════════════════════════════════════════════════════════
 // AUTH & SESSION
 // ══════════════════════════════════════════════════════════
-function doLogin() {
+function toggleAuth(showReg) {
+  document.getElementById('login-card').style.display = showReg ? 'none' : 'block';
+  document.getElementById('register-card').style.display = showReg ? 'block' : 'none';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('register-error').textContent = '';
+}
+
+async function doRegister() {
+  const name  = document.getElementById('r-name').value.trim();
+  const email = document.getElementById('r-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('r-pass').value;
+  const err   = document.getElementById('register-error');
+
+  if (!name || !email || !pass) { err.textContent = '✗ All fields required'; return; }
+  if (getEmployees().find(e => e.email === email)) { err.textContent = '✗ Email already registered'; return; }
+
+  // Generate unique EMP ID
+  const lastEmp = getEmployees().sort((a,b) => b.id.localeCompare(a.id))[0];
+  const nextNum = parseInt(lastEmp?.id.replace('EMP','') || '0') + 1;
+  const empId   = 'EMP' + String(nextNum).padStart(3, '0');
+
+  const newEmp = {
+    id: empId, name, email, role: 'TK', designation: 'Timekeeper',
+    avatar: name.charAt(0).toUpperCase(), active: true,
+    joinDate: today(), phone: '', status: 'active'
+  };
+
+  const newUser = {
+    employee_id: empId, username: email, password: pass, role: 'TK', email
+  };
+
+  try {
+    await sbUpsert('employees', [newEmp]);
+    await sbUpsert('users', [newUser]);
+    DB.employees.push(newEmp);
+    DB.users.push(newUser);
+    showToast('Registration successful! Please login.', 'success');
+    toggleAuth(false);
+  } catch (e) {
+    err.textContent = '✗ Registration failed. Try again.';
+  }
+}
+
+async function doLogin() {
   const username = document.getElementById('l-user').value.trim().toLowerCase();
   const password = document.getElementById('l-pass').value;
   const err      = document.getElementById('login-error');
 
-  const users = getUsers();
-  const user  = users.find(u => u.username.toLowerCase()===username && u.password===password);
-  if (!user) { err.textContent = '✗ Invalid username or password'; return; }
+  err.textContent = 'Logging in...';
 
-  const emp = getEmployees().find(e => e.id===user.employeeId);
-  if (!emp || !emp.active) { err.textContent = '✗ Account inactive'; return; }
+  const { data: user, error } = await supabaseClient.from('users')
+    .select('*')
+    .eq('username', username)
+    .eq('password', password)
+    .single();
+
+  if (error || !user) { err.textContent = '✗ Invalid username or password'; return; }
+
+  const { data: emp, error: empErr } = await supabaseClient.from('employees')
+    .select('*')
+    .eq('id', user.employee_id || user.employeeId)
+    .single();
+
+  if (empErr || !emp || !emp.active) { err.textContent = '✗ Account inactive'; return; }
 
   sessionStorage.setItem('sup_session', JSON.stringify({
-    employeeId: emp.id, role: emp.role, username: user.username, loginTime: nowISO()
+    employeeId: emp.id, role: emp.role, username: user.username, companyId: emp.company_id, loginTime: nowISO()
   }));
   err.textContent = '';
+  
+  const loader = document.getElementById('fb-loading');
+  if (loader) loader.style.display = 'flex';
+  await loadAllFromSupabase(emp.company_id, emp.role);
+  if (loader) loader.style.display = 'none';
+  
   showApp();
 }
 
@@ -496,6 +633,11 @@ function getSession() {
   return s ? JSON.parse(s) : null;
 }
 
+function getActiveSiteId() {
+  const sess = getSession();
+  return sess ? sess.activeSiteId : null;
+}
+
 function getCurrentEmp() {
   const s = getSession();
   if (!s) return null;
@@ -508,9 +650,18 @@ function hasAccess(tab) {
   return (TAB_ACCESS[tab]||[]).includes(s.role);
 }
 
-function initAuth() {
+async function initAuth() {
+  const { data: users } = await supabaseClient.from('users').select('username').limit(1);
+  if (!users || users.length === 0) {
+    const adminUser = { employee_id: 'ADMIN001', username: 'admin', password: 'admin123', role: 'SU' };
+    const adminEmp  = { id: 'ADMIN001', name: 'Super Admin', role: 'SU', designation: 'Super Admin', active: true, avatar: '👑' };
+    await sbUpsert('employees', [adminEmp]);
+    await sbUpsert('users', [adminUser]);
+  }
+
   const s = getSession();
-  if (s && getEmployees().find(e=>e.id===s.employeeId)) {
+  if (s) {
+    await loadAllFromSupabase(s.companyId, s.role);
     showApp();
   } else {
     document.getElementById('login-screen').style.display = 'flex';
@@ -530,9 +681,56 @@ function showApp() {
   document.getElementById('hdr-role').textContent   = ROLES[emp.role]?.label || emp.role;
   const slimAv = document.getElementById('slim-avatar');
   if (slimAv) { slimAv.textContent = emp.avatar; slimAv.style.background = avatarColor(emp.role); }
+
+  const hdrSelect = document.getElementById('header-site-select');
+  const slimSelect = document.getElementById('slim-site-select');
+  if (hdrSelect && slimSelect) {
+    if (emp.role === 'SU' || emp.role === 'PM') {
+      hdrSelect.style.display = 'none';
+      slimSelect.style.display = 'none';
+    } else {
+      const mySiteIds = (DB.employee_sites || []).filter(es => es.employee_id === emp.id).map(es => es.site_id);
+      const mySites = (DB.sites || []).filter(s => mySiteIds.includes(s.id));
+      if (mySites.length > 0) {
+        hdrSelect.style.display = 'inline-block';
+        slimSelect.style.display = 'inline-block';
+        const optionsHTML = mySites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        hdrSelect.innerHTML = optionsHTML;
+        slimSelect.innerHTML = optionsHTML;
+        
+        const sess = getSession();
+        if (!sess.activeSiteId || !mySiteIds.includes(sess.activeSiteId)) {
+          sess.activeSiteId = mySites[0].id;
+          sessionStorage.setItem('sup_session', JSON.stringify(sess));
+        }
+        hdrSelect.value = sess.activeSiteId;
+        slimSelect.value = sess.activeSiteId;
+      } else {
+        hdrSelect.style.display = 'none';
+        slimSelect.style.display = 'none';
+      }
+    }
+  }
+
   buildNav();
   updateMsgBadge();
   showTab('dashboard');
+}
+
+function changeActiveSite(siteId) {
+  const sess = getSession();
+  if (sess) {
+    sess.activeSiteId = siteId;
+    sessionStorage.setItem('sup_session', JSON.stringify(sess));
+    const hdrSelect = document.getElementById('header-site-select');
+    const slimSelect = document.getElementById('slim-site-select');
+    if (hdrSelect) hdrSelect.value = siteId;
+    if (slimSelect) slimSelect.value = siteId;
+    
+    const activeTabBtn = document.querySelector('#main-nav button.active');
+    if (activeTabBtn) showTab(activeTabBtn.dataset.tab, activeTabBtn);
+    else showTab('dashboard');
+  }
 }
 
 function buildNav() {
@@ -554,6 +752,7 @@ function showTab(name, btn) {
   document.querySelectorAll('#main-nav button').forEach(b => b.classList.remove('active'));
   const sec = document.getElementById('sec-'+name);
   if (sec) sec.classList.add('active');
+  if (name === 'admin') renderAdminDashboard();
   // Sub-tabs of More keep the More button highlighted
   const navTabName = MORE_SUB_TABS.includes(name) ? 'more' : name;
   if (btn && !MORE_SUB_TABS.includes(name)) btn.classList.add('active');
@@ -637,12 +836,12 @@ function renderMore() {
     {
       id:'more-hr', icon:'📋', title:'HR Policy Highlights',
       body:`<div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-              <div style="padding:8px 10px;background:#F8FAFC;border-radius:8px;border-left:3px solid var(--brand)"><b>Working Hours:</b> 9:00 AM – 6:00 PM (Mon–Sat). Site ops may vary.</div>
-              <div style="padding:8px 10px;background:#F8FAFC;border-radius:8px;border-left:3px solid var(--success)"><b>Leave:</b> 12 paid leaves/year. Apply at least 2 days in advance via Schedule tab.</div>
-              <div style="padding:8px 10px;background:#F8FAFC;border-radius:8px;border-left:3px solid var(--warning)"><b>Attendance:</b> Punch IN/OUT daily. Mispunch corrections via Schedule → Punch Request.</div>
-              <div style="padding:8px 10px;background:#F8FAFC;border-radius:8px;border-left:3px solid var(--accent)"><b>Overtime:</b> Pre-approved by PM/SM. Submit Extra Hours request after completion.</div>
-              <div style="padding:8px 10px;background:#F8FAFC;border-radius:8px;border-left:3px solid var(--danger)"><b>Code of Conduct:</b> Maintain professionalism on site. Safety gear mandatory at all times.</div>
-              <div style="padding:8px 10px;background:#F8FAFC;border-radius:8px;border-left:3px solid #86198F"><b>Grievances:</b> Raise concerns directly with HR or PM in person or via Chat.</div>
+              <div class="hr-policy-item" style="border-left-color:var(--brand)"><b>Working Hours:</b> 9:00 AM – 6:00 PM (Mon–Sat). Site ops may vary.</div>
+              <div class="hr-policy-item" style="border-left-color:var(--success)"><b>Leave:</b> 12 paid leaves/year. Apply at least 2 days in advance via Schedule tab.</div>
+              <div class="hr-policy-item" style="border-left-color:var(--warning)"><b>Attendance:</b> Punch IN/OUT daily. Mispunch corrections via Schedule → Punch Request.</div>
+              <div class="hr-policy-item" style="border-left-color:var(--accent)"><b>Overtime:</b> Pre-approved by PM/SM. Submit Extra Hours request after completion.</div>
+              <div class="hr-policy-item" style="border-left-color:var(--danger)"><b>Code of Conduct:</b> Maintain professionalism on site. Safety gear mandatory at all times.</div>
+              <div class="hr-policy-item" style="border-left-color:#a855f7"><b>Grievances:</b> Raise concerns directly with HR or PM in person or via Chat.</div>
             </div>`
     }
   ];
@@ -981,7 +1180,7 @@ function renderSelfAttend() {
     </div>`;
 }
 
-function markSelfIN() {
+async function markSelfIN() {
   const emp = getCurrentEmp();
   const att = getSupAtt();
   const idx = att.findIndex(a=>a.employeeId===emp.id && a.date===today());
@@ -993,13 +1192,13 @@ function markSelfIN() {
   } else {
     att[idx].punches.push({inTime:nowTime(), outTime:null});
   }
-  saveSupAtt(att);
+  await saveSupAtt(att);
   showToast('IN marked at '+nowTime(),'success');
   renderDashboard();
   if (document.getElementById('attend-today')) renderSelfAttend();
 }
 
-function markSelfOUT() {
+async function markSelfOUT() {
   const emp = getCurrentEmp();
   const att = getSupAtt();
   const idx = att.findIndex(a=>a.employeeId===emp.id && a.date===today());
@@ -1008,7 +1207,7 @@ function markSelfOUT() {
   }
   const punches = att[idx].punches;
   punches[punches.length-1].outTime = nowTime();
-  saveSupAtt(att);
+  await saveSupAtt(att);
   showToast('OUT marked at '+nowTime(),'success');
   renderDashboard();
   if (document.getElementById('attend-today')) renderSelfAttend();
@@ -1062,7 +1261,7 @@ function openPunchRequest() {
   openModal('modal-punch-req');
 }
 
-function submitPunchRequest() {
+async function submitPunchRequest() {
   const emp    = getCurrentEmp();
   const type   = document.getElementById('pr-type').value;
   const date   = document.getElementById('pr-date').value;
@@ -1079,7 +1278,7 @@ function submitPunchRequest() {
     decidedBy: null, decisionNote: '',
     submittedAt: nowISO(), decidedAt: null
   });
-  savePunchRequests(reqs);
+  await savePunchRequests(reqs);
   closeModal('modal-punch-req');
   showToast('Request submitted','success');
   renderPunchRequests();
@@ -1157,7 +1356,7 @@ function openReviewRequest(reqId) {
   openModal('modal-review-req');
 }
 
-function decideRequest(decision) {
+async function decideRequest(decision) {
   const req = getPunchRequests().find(r=>r.id===_reviewingReqId);
   if (!req) return;
   const note = document.getElementById('rr-note').value.trim();
@@ -1165,15 +1364,15 @@ function decideRequest(decision) {
   req.decidedBy   = getCurrentEmp().id;
   req.decisionNote= note;
   req.decidedAt   = nowISO();
-  if (decision === 'approved') applyApprovedRequest(req);
-  savePunchRequests(getPunchRequests());
+  if (decision === 'approved') await applyApprovedRequest(req);
+  await savePunchRequests(getPunchRequests());
   closeModal('modal-review-req');
   _reviewingReqId = null;
   showToast('Request '+decision,'success');
   renderPunchRequests();
 }
 
-function applyApprovedRequest(req) {
+async function applyApprovedRequest(req) {
   const att = getSupAtt();
   const idx = att.findIndex(a=>a.employeeId===req.employeeId && a.date===req.date);
   const punch = { inTime: req.inTime, outTime: req.outTime||null };
@@ -1183,7 +1382,7 @@ function applyApprovedRequest(req) {
   } else {
     att.push({ employeeId: req.employeeId, date: req.date, punches: [punch] });
   }
-  saveSupAtt(att);
+  await saveSupAtt(att);
 }
 
 function renderPersonalPlanner() {
@@ -1313,7 +1512,7 @@ function selectMyAvail(date, status, clickedBtn) {
   }
 }
 
-function applyAvailChanges() {
+async function applyAvailChanges() {
   const emp   = getCurrentEmp();
   const avail = getAvailList();
   Object.entries(pendingAvailChanges).forEach(([date, status]) => {
@@ -1321,7 +1520,7 @@ function applyAvailChanges() {
     if (idx > -1) avail[idx].status = status;
     else avail.push({ employeeId:emp.id, date, status });
   });
-  saveAvailList(avail);
+  await saveAvailList(avail);
   const count = Object.keys(pendingAvailChanges).length;
   pendingAvailChanges = {};
   showToast(count + ' availability change'+(count>1?'s':'')+' saved','success');
@@ -1421,8 +1620,8 @@ function openEmpProfile(empId) {
       </div>`;
   }
 
-  // Edit employee info (PM/SM/HR only, not self)
-  if (e.id !== sess.employeeId && ['PM','SM','HR'].includes(sess.role)) {
+  // Edit employee info (SU/PM/SM/HR only, not self)
+  if (e.id !== sess.employeeId && ['SU','PM','SM','HR'].includes(sess.role)) {
     mgmtHtml += `
       <div style="margin-top:14px;padding-top:14px;border-top:2px solid #eee">
         <h3 style="margin-bottom:10px">✏️ Edit Employee Info</h3>
@@ -1432,7 +1631,7 @@ function openEmpProfile(empId) {
         <input type="text" id="ei-dept-${e.id}" value="${escHtml(e.department||'')}" style="margin-bottom:8px">
         <label style="font-size:12px;color:#888;font-weight:600">Mobile</label>
         <input type="tel" id="ei-mobile-${e.id}" value="${e.mobile||''}" style="margin-bottom:8px">
-        ${isPM ? `<label style="font-size:12px;color:#888;font-weight:600">Date of Joining</label>
+        ${['SU','PM'].includes(sess.role) ? `<label style="font-size:12px;color:#888;font-weight:600">Date of Joining</label>
         <input type="date" id="ei-joindate-${e.id}" value="${e.joinDate||''}" style="margin-bottom:8px">` : ''}
         <button class="btn btn-primary" style="margin:0;font-size:14px" onclick="saveEmpInfoEdit('${e.id}')">Save Changes</button>
       </div>`;
@@ -1543,7 +1742,7 @@ function openEmpProfile(empId) {
   openModal('modal-emp-profile');
 }
 
-function addEmployee() {
+async function addEmployee() {
   const name   = document.getElementById('ae-name').value.trim();
   const role   = document.getElementById('ae-role').value;
   const dept   = document.getElementById('ae-dept').value.trim();
@@ -1567,9 +1766,9 @@ function addEmployee() {
     active: true, status: 'active'
   };
   emps.push(newEmp);
-  saveEmployees(emps);
+  await saveEmployees(emps);
   users.push({ username:user, password:pass, employeeId:newEmp.id, role });
-  saveUsers(users);
+  await saveUsers(users);
 
   closeModal('modal-add-emp');
   showToast(name+' added successfully','success');
@@ -1577,7 +1776,7 @@ function addEmployee() {
   ['ae-name','ae-dept','ae-mobile','ae-joindate','ae-user','ae-pass'].forEach(id=>document.getElementById(id).value='');
 }
 
-function saveEmpInfoEdit(empId) {
+async function saveEmpInfoEdit(empId) {
   const sess = getSession();
   if (!['PM','SM','HR'].includes(sess.role)) return;
   const emps = getEmployees();
@@ -1595,7 +1794,7 @@ function saveEmpInfoEdit(empId) {
     const joinDate = document.getElementById('ei-joindate-'+empId)?.value;
     if (joinDate) emps[idx].joinDate = joinDate;
   }
-  saveEmployees(emps);
+  await saveEmployees(emps);
   showToast('Employee info updated', 'success');
   openEmpProfile(empId);
 }
@@ -1608,7 +1807,7 @@ let taskFilter = 'all';
 function renderTasks() {
   const role   = getSession()?.role||'';
   const empId  = getCurrentEmp()?.id;
-  const canCreate = ['PM','SM','SE'].includes(role);
+  const canCreate = ['SU','PM','SM','SE'].includes(role);
   const allTasks = getTasks();
   const cnt = {
     all: allTasks.length,
@@ -1633,8 +1832,8 @@ function renderTasks() {
   let tasks = getTasks();
   if (taskFilter !== 'all') tasks = tasks.filter(t=>t.status===taskFilter);
 
-  // Non-PM/SM only see their own tasks
-  if (!['PM','SM'].includes(role)) tasks = tasks.filter(t=>t.assignedTo===empId);
+  // Non-SU/PM/SM only see their own tasks
+  if (!['SU','PM','SM'].includes(role)) tasks = tasks.filter(t=>t.assignedTo===empId);
 
   const emps = getEmployees();
   const list = document.getElementById('task-list');
@@ -1663,7 +1862,7 @@ function openCreateTask() {
   openModal('modal-create-task');
 }
 
-function createTask() {
+async function createTask() {
   const title  = document.getElementById('ct-title').value.trim();
   const desc   = document.getElementById('ct-desc').value.trim();
   const assign = document.getElementById('ct-assign').value;
@@ -1678,7 +1877,7 @@ function createTask() {
     assignedTo:assign, createdBy:getCurrentEmp().id,
     createdAt:nowISO(), dueDate:due, completedAt:null
   });
-  saveTasks(tasks);
+  await saveTasks(tasks);
   closeModal('modal-create-task');
   showToast('Task created','success');
   renderTasks();
@@ -1693,7 +1892,7 @@ function openTaskDetail(taskId) {
   const c    = emps.find(e=>e.id===t.createdBy);
   const role = getSession()?.role||'';
   const empId= getCurrentEmp()?.id;
-  const canEdit = ['PM','SM','SE'].includes(role) || t.assignedTo===empId;
+  const canEdit = ['SU','PM','SM','SE'].includes(role) || t.assignedTo===empId;
 
   const statusOpts = ['open','in-progress','completed','on-hold'].map(s=>
     `<button class="btn-sm" style="background:${t.status===s?'#1a3c5e':'#eee'};color:${t.status===s?'#fff':'#555'};margin:3px"
@@ -1720,13 +1919,13 @@ function openTaskDetail(taskId) {
   openModal('modal-task-detail');
 }
 
-function updateTaskStatus(taskId, status) {
+async function updateTaskStatus(taskId, status) {
   const tasks = getTasks();
   const idx   = tasks.findIndex(t=>t.id===taskId);
   if (idx===-1) return;
   tasks[idx].status = status;
   if (status==='completed') tasks[idx].completedAt = nowISO();
-  saveTasks(tasks);
+  await saveTasks(tasks);
   closeModal('modal-task-detail');
   showToast('Status updated','success');
   renderTasks();
@@ -1738,7 +1937,7 @@ function addNote() {
   // Legacy stub — notes now added from employee profile
 }
 
-function addNoteFromProfile(empId) {
+async function addNoteFromProfile(empId) {
   const catEl  = document.getElementById('pnote-cat-'+empId);
   const textEl = document.getElementById('pnote-text-'+empId);
   if (!textEl) return;
@@ -1750,7 +1949,7 @@ function addNoteFromProfile(empId) {
     aboutEmployeeId: empId, byEmployeeId: getCurrentEmp().id,
     text, category: catEl?.value||'general', createdAt: nowISO()
   });
-  saveNotes(notes);
+  await saveNotes(notes);
   showToast('Note saved','success');
   openEmpProfile(empId); // refresh profile with new note
 }
@@ -2180,7 +2379,7 @@ function renderHierarchy() {
   const me   = getCurrentEmp();
   const role = getSession()?.role||'';
   const q    = (document.getElementById('people-search')?.value||'').toLowerCase();
-  const canManage = ['PM','SM','HR'].includes(role);
+  const canManage = ['SU','PM','SM','HR'].includes(role);
 
   renderCrewAddBtn();
 
@@ -2361,7 +2560,7 @@ function renderConvList() {
   }).join('');
 }
 
-function openWAChat(empId) {
+async function openWAChat(empId) {
   const me  = getCurrentEmp();
   const emp = getEmployees().find(e=>e.id===empId);
   if (!emp) return;
@@ -2369,9 +2568,19 @@ function openWAChat(empId) {
   waChatWith = empId;
 
   // Mark received msgs from this person as read
-  const msgs = getMessages(); let chg = false;
-  msgs.forEach(m=>{ if(m.from===empId&&m.to===me.id&&!m.read){ m.read=true; fbSet('messages',m.id,m); chg=true; } });
-  if (chg) updateMsgBadge();
+  const msgs = getMessages();
+  const toUpdate = [];
+  msgs.forEach(m => {
+    if (m.from === empId && m.to === me.id && !m.read) {
+      m.read = true;
+      toUpdate.push(m);
+    }
+  });
+
+  if (toUpdate.length > 0) {
+    await sbUpsert('messages', toUpdate);
+    updateMsgBadge();
+  }
 
   document.getElementById('wa-chat-hdr').innerHTML = `
     <button class="wa-back-btn" onclick="closeWAChat()">‹</button>
@@ -2513,7 +2722,7 @@ function createGroup() {
   openWAGroupChat(newGrp.id);
 }
 
-function waSend() {
+async function waSend() {
   const input = document.getElementById('wa-input');
   const text  = input?.value.trim();
   if (!text) return;
@@ -2523,14 +2732,14 @@ function waSend() {
   if (waChatGroup) {
     const msg = { id, from:me.id, groupId:waChatGroup, text, timestamp:nowISO() };
     DB.messages.push(msg);
-    fbSet('messages', id, msg); // Write only this single message
+    await sbUpsert('messages', [msg]); // Write only this single message
     input.value = '';
     renderWAGroupThread();
     setTimeout(()=>{ const a=document.getElementById('wa-chat-msgs'); if(a) a.scrollTop=a.scrollHeight; },30);
   } else if (waChatWith) {
     const msg = { id, from:me.id, to:waChatWith, text, timestamp:nowISO(), read:false };
     DB.messages.push(msg);
-    fbSet('messages', id, msg); // Write only this single message
+    await sbUpsert('messages', [msg]); // Write only this single message
     input.value = '';
     renderWAChatThread();
     updateMsgBadge();
@@ -2576,10 +2785,10 @@ let padFilter = 'all';
 
 function padUserId() { return getCurrentEmp()?.id||'guest'; }
 function getPadItems() { return DB.pad[padUserId()] || []; }
-function savePadItems(d) {
+async function savePadItems(d) {
   const uid = padUserId();
   DB.pad[uid] = d;
-  fbBatchSet('pad', d.map(item=>({...item, userId:uid})), item=>uid+'_'+item.id);
+  await sbUpsert('pad', d.map(item => ({ ...item, userId: uid })));
 }
 
 const PAD_ICONS  = { task:'✅', note:'📝', call:'📞', voice:'🎙' };
@@ -2708,10 +2917,11 @@ function togglePadDone(id) {
   if (idx>-1) { items[idx].done = !items[idx].done; savePadItems(items); renderMyPad(); }
 }
 
-function deletePadItem(id) {
+async function deletePadItem(id) {
   if (!confirm('Delete this item?')) return;
-  savePadItems(getPadItems().filter(i=>i.id!==id));
-  fbDel('pad', padUserId()+'_'+id);
+  const items = getPadItems().filter(i => i.id !== id);
+  await savePadItems(items);
+  await sbDel('pad', { userId: padUserId(), id: id });
   renderMyPad();
 }
 
@@ -2739,8 +2949,8 @@ let contactSearch = '';
 
 function renderContactsList() {
   const role   = getSession()?.role||'';
-  const canEdit= ['PM','SM','SE','EN'].includes(role);
-  const canDel = ['PM','SM'].includes(role);
+  const canEdit= ['SU','PM','SM','SE','EN'].includes(role);
+  const canDel = ['SU','PM','SM'].includes(role);
   let contacts = getContacts();
   if (contactCatFilter !== 'all') contacts = contacts.filter(c=>c.category===contactCatFilter);
   if (contactSearch) {
@@ -2828,8 +3038,8 @@ function _setContactModalCallBtn(phone) {
 
 function openContactDetail(id) {
   const role    = getSession()?.role||'';
-  const canEdit = ['PM','SM','SE','EN'].includes(role);
-  const canDel  = ['PM','SM'].includes(role);
+  const canEdit = ['SU','PM','SM','SE','EN'].includes(role);
+  const canDel  = ['SU','PM','SM'].includes(role);
   const c = getContacts().find(x=>x.id===id);
   if (!c) return;
   // Always open as read-only view
@@ -2859,7 +3069,7 @@ function openEditContact(id) {
   const c = getContacts().find(x=>x.id===id);
   if (!c) return;
   const role   = getSession()?.role||'';
-  const canDel = ['PM','SM'].includes(role);
+  const canDel = ['SU','PM','SM'].includes(role);
   document.getElementById('ac-modal-title').textContent = 'Edit Contact';
   document.getElementById('ac-edit-id').value  = c.id;
   document.getElementById('ac-name').value     = c.name;
@@ -2908,19 +3118,19 @@ function saveContact() {
   renderContactsList();
 }
 
-function deleteContact(id) {
+async function deleteContact(id) {
   if (!confirm('Delete this contact?')) return;
-  const contacts = getContacts().filter(c=>c.id!==id);
-  saveContacts(contacts);
-  fbDel('contacts', id);
-  showToast('Contact deleted','info');
+  const contacts = getContacts().filter(c => c.id !== id);
+  await saveContacts(contacts);
+  await sbDel('contacts', { id: id });
+  showToast('Contact deleted', 'info');
   renderContactsList();
 }
 
 // ══════════════════════════════════════════════════════════
 // SEED DATA
 // ══════════════════════════════════════════════════════════
-function seedData() {
+async function seedData() {
   // v4: add extended profile fields (blood group, birthdate, address, vehicle) to all employees
   const existingEmps4 = getEmployees();
   if (existingEmps4.length > 0 && !existingEmps4.find(e => e.bloodGroup)) {
@@ -3259,29 +3469,324 @@ function seedData() {
     { id:'CON010', name:'Site Security Guard (Night)',       category:'other',     phone:'9099801234', description:'Night shift security — call for site access after hours', addedBy:'EMP002', addedAt:dateOffset(10)+'T08:00:00' }
   ];
 
-  saveEmployees(employees);
-  saveUsers(users);
-  saveSupAtt(attendance);
-  saveAvailList(availability);
-  saveTasks(tasks);
-  saveNotes(notes);
-  saveContacts(contacts);
+  await saveEmployees(employees);
+  await saveUsers(users);
+  await saveSupAtt(attendance);
+  await saveAvailList(availability);
+  await saveTasks(tasks);
+  await saveNotes(notes);
+  await saveContacts(contacts);
   DB.seeded = true;
-  fbSet('meta', 'config', { seeded: true });
+  await sbUpsert('meta', [{ key: 'config', seeded: true }]);
 }
 
 // ══════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════
-(async () => {
-  try {
-    await loadAllFromFirestore();
-  } catch(e) {
-    console.error('Firestore load failed:', e);
+// ══════════════════════════════════════════════════════════
+// ADMIN DASHBOARD
+// ══════════════════════════════════════════════════════════
+function renderAdminDashboard() {
+  const sess = getSession();
+  if (sess && sess.role === 'SU') {
+    renderSuperadminDashboard();
+  } else {
+    renderCompanyAdminDashboard();
   }
-  document.getElementById('fb-loading').style.display = 'none';
-  seedData();
-  migrateAttendance();
-  initAuth();
-  startMessageListener();
+}
+
+function renderSuperadminDashboard() {
+  const companies = DB.companies || [];
+  
+  document.getElementById('admin-stat-users').textContent = companies.length;
+  document.getElementById('admin-stat-users').nextElementSibling.textContent = 'Total Companies';
+  
+  document.getElementById('admin-stat-att').parentElement.style.display = 'none';
+  document.getElementById('admin-stat-tasks').parentElement.style.display = 'none';
+  
+  document.getElementById('admin-pulse').textContent = 'Superadmin Control Center';
+
+  const list = document.getElementById('admin-user-list');
+  list.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 14px 0">
+      <h2 style="margin:0">Companies</h2>
+      <button class="btn-sm btn-primary" onclick="openCreateCompany()">+ New Company</button>
+    </div>
+  `;
+
+  companies.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'emp-card';
+    div.innerHTML = `
+      <div class="emp-avatar" style="background:#1D5FA8">🏢</div>
+      <div class="dir-info" style="flex:1">
+        <div class="emp-name">${c.name}</div>
+        <div class="emp-detail">ID: ${c.id}</div>
+      </div>
+      <div class="emp-actions">
+        <button class="btn-sm btn-accent" onclick="manageCompany('${c.id}')">Manage Admins</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function renderCompanyAdminDashboard() {
+  const users = getUsers();
+  const emps  = getEmployees();
+  const att   = getSupAtt().filter(a => a.date === today());
+  const tasks = getTasks().filter(t => t.status !== 'completed');
+
+  document.getElementById('admin-stat-users').textContent = users.length;
+  document.getElementById('admin-stat-users').nextElementSibling.textContent = 'Total Users';
+  document.getElementById('admin-stat-att').parentElement.style.display = 'flex';
+  document.getElementById('admin-stat-att').textContent   = att.length;
+  document.getElementById('admin-stat-tasks').parentElement.style.display = 'flex';
+  document.getElementById('admin-stat-tasks').textContent = tasks.length;
+  document.getElementById('admin-pulse').textContent     = 'Company Admin Control';
+
+  const list = document.getElementById('admin-user-list');
+  list.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 14px 0">
+      <h2 style="margin:0">User Management</h2>
+      <button class="btn-sm btn-primary" onclick="openCreateUser()">+ New User</button>
+    </div>
+    <div id="company-user-list"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 14px 0">
+      <h2 style="margin:0">Site Management</h2>
+      <button class="btn-sm btn-primary" onclick="openCreateSite()">+ New Site</button>
+    </div>
+    <div id="company-site-list"></div>
+  `;
+  
+  const clist = document.getElementById('company-user-list');
+
+  users.sort((a,b) => a.username.localeCompare(b.username)).forEach(u => {
+    const emp = emps.find(e => e.id === u.employee_id || e.id === u.employeeId);
+    if (!emp) return;
+
+    const div = document.createElement('div');
+    div.className = 'emp-card';
+    div.innerHTML = `
+      <div class="emp-avatar" style="background:${avatarColor(u.role)}">${emp.avatar}</div>
+      <div class="dir-info" style="flex:1">
+        <div class="emp-name">${emp.name} <span style="font-size:11px;color:#94A3B8;font-weight:normal">(@${u.username})</span></div>
+        <div class="emp-detail">${ROLES[u.role]?.label || u.role} • ${emp.id}</div>
+      </div>
+      <div class="emp-actions">
+        <select class="btn-sm" style="width:auto;padding:2px 8px;margin:0" onchange="adminChangeRole('${emp.id}', this.value)">
+          ${Object.keys(ROLES).map(r => `<option value="${r}" ${r===u.role?'selected':''}>${r}</option>`).join('')}
+        </select>
+        <button class="icon-btn ib-view" onclick="openEmpProfile('${emp.id}')" title="View Profile">👤</button>
+      </div>
+    `;
+    clist.appendChild(div);
+  });
+
+  const slist = document.getElementById('company-site-list');
+  const sites = DB.sites || [];
+  if (sites.length === 0) {
+    slist.innerHTML = '<div style="color:#64748b">No sites created yet.</div>';
+  } else {
+    sites.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'emp-card';
+      div.innerHTML = `
+        <div class="emp-avatar" style="background:#0F766E">🏗️</div>
+        <div class="dir-info" style="flex:1">
+          <div class="emp-name">${s.name}</div>
+          <div class="emp-detail">ID: ${s.id}</div>
+        </div>
+        <div class="emp-actions">
+          <button class="btn-sm btn-accent" onclick="manageSite('${s.id}')">Manage Workers</button>
+        </div>
+      `;
+      slist.appendChild(div);
+    });
+  }
+}
+
+function openCreateCompany() {
+  document.getElementById('cc-name').value = '';
+  openModal('modal-create-company');
+}
+
+async function doCreateCompany() {
+  const name = document.getElementById('cc-name').value.trim();
+  if (!name) return;
+  const newComp = { name };
+  const { data, error } = await supabaseClient.from('companies').insert([newComp]).select().single();
+  if (!error && data) {
+    DB.companies.push(data);
+    closeModal('modal-create-company');
+    renderSuperadminDashboard();
+    showToast('Company created successfully', 'success');
+  } else {
+    showToast('Error creating company', 'error');
+  }
+}
+
+async function manageCompany(compId) {
+  const comp = DB.companies.find(c => c.id === compId);
+  if (!comp) return;
+  document.getElementById('mc-company-id').value = compId;
+  document.getElementById('mc-admin-name').value = '';
+  document.getElementById('mc-admin-user').value = '';
+  document.getElementById('mc-admin-pass').value = '';
+
+  const { data: users, error } = await supabaseClient.from('users').select('*').eq('role', 'PM');
+  const { data: emps } = await supabaseClient.from('employees').select('*').eq('company_id', compId).eq('role', 'PM');
+  
+  const content = document.getElementById('mc-content');
+  if (emps && emps.length > 0) {
+    content.innerHTML = emps.map(e => {
+      const u = (users || []).find(usr => usr.employee_id === e.id);
+      return `<div style="padding:8px;background:#f8fafc;margin-bottom:4px;border-radius:4px;">
+        <strong>${e.name}</strong> <span style="color:#64748b">(@${u ? u.username : 'N/A'})</span>
+      </div>`;
+    }).join('');
+  } else {
+    content.innerHTML = '<div style="color:#64748b">No admins found for this company.</div>';
+  }
+
+  openModal('modal-manage-company');
+}
+
+async function doAddCompanyAdmin() {
+  const compId = document.getElementById('mc-company-id').value;
+  const name = document.getElementById('mc-admin-name').value.trim();
+  const username = document.getElementById('mc-admin-user').value.trim().toLowerCase();
+  const password = document.getElementById('mc-admin-pass').value;
+
+  if (!name || !username || !password) return;
+
+  const empId = 'EMP' + Date.now().toString().slice(-6);
+
+  const newEmp = { id: empId, name, role: 'PM', designation: 'Company Admin', active: true, company_id: compId };
+  const newUser = { employee_id: empId, username, password, role: 'PM', company_id: compId };
+
+  await supabaseClient.from('employees').insert([newEmp]);
+  await supabaseClient.from('users').insert([newUser]);
+  
+  closeModal('modal-manage-company');
+  showToast('Admin added successfully', 'success');
+}
+
+function openCreateSite() {
+  document.getElementById('cs-name').value = '';
+  openModal('modal-create-site');
+}
+
+async function doCreateSite() {
+  const name = document.getElementById('cs-name').value.trim();
+  if (!name) return;
+  const sess = getSession();
+  const newSite = { name, company_id: sess.companyId };
+  const { data, error } = await supabaseClient.from('sites').insert([newSite]).select().single();
+  if (!error && data) {
+    DB.sites.push(data);
+    closeModal('modal-create-site');
+    renderCompanyAdminDashboard();
+    showToast('Site created successfully', 'success');
+  } else {
+    showToast('Error creating site', 'error');
+  }
+}
+
+let currentManageSiteId = null;
+
+function manageSite(siteId) {
+  currentManageSiteId = siteId;
+  const site = DB.sites.find(s => s.id === siteId);
+  if (!site) return;
+  
+  document.getElementById('manage-site-title').textContent = `Manage: ${site.name}`;
+  
+  const siteEmpIds = (DB.employee_sites || []).filter(es => es.site_id === siteId).map(es => es.employee_id);
+  const listEl = document.getElementById('site-employee-list');
+  
+  // Show all employees in the company
+  const allEmps = DB.employees || [];
+  if (allEmps.length === 0) {
+    listEl.innerHTML = '<div style="color:#aaa;">No employees found in company.</div>';
+  } else {
+    listEl.innerHTML = allEmps.map(e => `
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; cursor:pointer;">
+        <input type="checkbox" class="site-emp-cb" value="${e.id}" ${siteEmpIds.includes(e.id) ? 'checked' : ''}>
+        <span>${e.name} (${e.role})</span>
+      </label>
+    `).join('');
+  }
+  
+  openModal('modal-manage-site');
+}
+
+async function saveSiteEmployees() {
+  if (!currentManageSiteId) return;
+  const cbs = document.querySelectorAll('.site-emp-cb');
+  const selectedIds = Array.from(cbs).filter(cb => cb.checked).map(cb => cb.value);
+  
+  try {
+    // Delete existing links for this site
+    await sbDel('employee_sites', { site_id: currentManageSiteId });
+    DB.employee_sites = DB.employee_sites.filter(es => es.site_id !== currentManageSiteId);
+    
+    // Insert new links
+    if (selectedIds.length > 0) {
+      const newLinks = selectedIds.map(empId => ({
+        site_id: currentManageSiteId,
+        employee_id: empId
+      }));
+      await sbUpsert('employee_sites', newLinks);
+      DB.employee_sites.push(...newLinks);
+    }
+    showToast('Site assignments saved', 'success');
+    closeModal('modal-manage-site');
+  } catch(err) {
+    showToast('Failed to save assignments', 'error');
+  }
+}
+
+async function adminChangeRole(empId, newRole) {
+  const users = getUsers();
+  const u = users.find(x => x.employeeId === empId || x.employee_id === empId);
+  if (!u) return;
+
+  const emps = getEmployees();
+  const emp = emps.find(e => e.id === empId);
+
+  u.role = newRole;
+  if (emp) {
+    emp.role = newRole;
+    emp.designation = ROLES[newRole]?.label || newRole;
+  }
+
+  await sbUpsert('users', [u]);
+  if (emp) await sbUpsert('employees', [emp]);
+
+  showToast('Role updated to ' + newRole, 'success');
+  renderAdminDashboard();
+}
+
+(async () => {
+  console.log('App initialization starting...');
+  setTimeout(() => {
+    const loader = document.getElementById('fb-loading');
+    if (loader && loader.style.display !== 'none') {
+      console.warn('Initialization taking too long, forcing UI display...');
+      loader.style.display = 'none';
+      if (!getSession()) document.getElementById('login-screen').style.display = 'flex';
+    }
+  }, 10000);
+
+  console.log('Initializing Auth...');
+  await initAuth();
+
+  const loader = document.getElementById('fb-loading');
+  if (loader) loader.style.display = 'none';
+
+  console.log('Starting Listeners...');
+  startSupabaseListeners();
+  console.log('App Ready.');
 })();
+
