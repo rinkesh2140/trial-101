@@ -190,10 +190,10 @@ nav#main-nav button.active .tab-icon {
 
 /* ══════════ SECTIONS ══════════ */
 section {
-  padding: 16px 16px calc(var(--nav-h) + 40px);
+  padding: 12px 12px calc(var(--nav-h) + 32px);
   max-width: 600px; margin: 0 auto;
 }
-#sec-dashboard { padding-top: 24px; }
+#sec-dashboard { padding-top: 16px; }
 section.active { display: block; }
 
 /* ══════════ FORM ELEMENTS ══════════ */
@@ -253,8 +253,8 @@ select option { background: var(--bg); color: #fff; }
 /* ── DASHBOARD HERO ── */
 .dash-hero {
   background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand) 50%, var(--accent) 100%);
-  border-radius: var(--radius-lg); padding: 28px 22px;
-  margin-bottom: 20px; color: #fff; position: relative; overflow: hidden;
+  border-radius: var(--radius-lg); padding: 24px 18px;
+  margin-bottom: 16px; color: #fff; position: relative; overflow: hidden;
   box-shadow: 0 16px 40px rgba(99,102,241,0.35);
 }
 .dash-hero::before {
@@ -262,8 +262,8 @@ select option { background: var(--bg); color: #fff; }
   width: 300px; height: 300px; border-radius: 50%;
   background: rgba(255,255,255,0.05); pointer-events: none;
 }
-.hero-greet { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
-.hero-sub   { font-size: 13px; opacity: 0.75; margin-bottom: 20px; }
+.hero-greet { font-size: clamp(20px, 6vw, 24px); font-weight: 800; margin-bottom: 4px; }
+.hero-sub   { font-size: 12px; opacity: 0.8; margin-bottom: 16px; }
 .hero-status {
   font-size: 13px; background: rgba(0,0,0,0.25);
   padding: 6px 14px; border-radius: 99px; display: inline-block; margin-bottom: 20px;
@@ -278,8 +278,8 @@ select option { background: var(--bg); color: #fff; }
 .hero-att-btn:active { transform: scale(0.97); }
 
 /* ── STAT BOXES ── */
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-.stat-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.stat-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .stat-box {
   background: var(--card); border: 1px solid var(--glass-border);
   border-radius: var(--radius-md); padding: 18px 12px; text-align: center;

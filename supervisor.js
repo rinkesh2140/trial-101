@@ -2388,6 +2388,40 @@ function setSupReportType(type, btn) {
 }
 
 let roleReportPeriod = 'monthly'; // 'daily' | 'weekly' | 'monthly'
+let lastReportData = [];
+
+function downloadCSV(csv, filename) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+}
+
+function exportCurrentReport() {
+  if (!lastReportData || !lastReportData.length) { showToast('No data to export','warning'); return; }
+  const ym = document.getElementById('sup-r-month')?.value || today().slice(0,7);
+  
+  let csv = '';
+  const headers = Object.keys(lastReportData[0]).filter(k => k !== 'e' && k !== 'w');
+  csv += headers.join(',') + '\n';
+  
+  lastReportData.forEach(row => {
+    csv += headers.map(h => {
+      let val = row[h];
+      if (typeof val === 'string' && val.includes(',')) val = `"${val}"`;
+      return val;
+    }).join(',') + '\n';
+  });
+
+  downloadCSV(csv, `Report_${supReportType}_${ym}.csv`);
+}
 
 function renderSupReports() {
   const role = getSession()?.role || '';
@@ -2395,6 +2429,7 @@ function renderSupReports() {
   const types = [
     { key:'emp-attend',   label:'👤 Attendance' },
     { key:'role-attend',  label:'🏷 Role-wise' },
+    { key:'payroll',      label:'💰 Payroll' },
     { key:'avail',        label:'📅 Availability' },
     { key:'seniority',    label:'🏅 Experience' },
     ...(!['HR'].includes(role) ? [{ key:'labour',  label:'👷 Labour' }]  : []),
@@ -2414,11 +2449,14 @@ function renderSupReports() {
 
   document.getElementById('sup-report-controls').innerHTML = `
     <div style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <strong>Month:</strong>
-        <input type="month" id="sup-r-month" value="${today().slice(0,7)}"
-               onchange="renderSupReportOutput()"
-               style="width:auto;margin:0;padding:10px 12px;font-size:15px">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px">
+          <strong>Month:</strong>
+          <input type="month" id="sup-r-month" value="${today().slice(0,7)}"
+                 onchange="renderSupReportOutput()"
+                 style="width:auto;margin:0;padding:10px 12px;font-size:15px">
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="exportCurrentReport()" style="margin:0;border-radius:var(--radius-sm)">📥 Export CSV</button>
       </div>
       ${periodRow}
     </div>`;
@@ -2436,14 +2474,21 @@ function renderSupReportOutput() {
   const mLabel= new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
 
   if (supReportType==='emp-attend') {
+    const attMap = new Map();
+    att.forEach(a => {
+      const key = `${a.employeeId}_${a.date}`;
+      attMap.set(key, a);
+    });
+
     const rows = emps.map(e => {
       let present=0, totalMins=0;
       dates.forEach(d => {
-        const r = att.find(a=>a.employeeId===e.id && a.date===d);
+        const r = attMap.get(`${e.id}_${d}`);
         if (r) { present++; totalMins += totalMinsForRec(r); }
       });
       return {e, present, absent:dates.length-present, totalMins};
     });
+    lastReportData = rows.map(r => ({ Name: r.e.name, Role: r.e.role, Present: r.present, Absent: r.absent, TotalHrs: (r.totalMins/60).toFixed(2) }));
     // Insights block for PM/SM/HR only
     const isAuthority = ['PM','SM','HR'].includes(getSession()?.role||'');
     let insightsHtml = '';
@@ -2452,9 +2497,30 @@ function renderSupReportOutput() {
       const topAtt  = sorted[0];
       const topHrs  = [...rows].filter(r=>r.totalMins>0).sort((a,b)=>b.totalMins-a.totalMins)[0];
       const perfect = rows.filter(r=>r.present===dates.length);
+      // Trend data (last 3 months)
+      const last3 = [];
+      for(let i=2; i>=0; i--) {
+        const d = new Date(+y, (+m-1)-i, 1);
+        const ym_i = d.toISOString().slice(0,7);
+        const att_i = att.filter(a => a.date.startsWith(ym_i));
+        const totalPossible = emps.length * getMonthDates(ym_i).filter(x=>!isFuture(x)).length;
+        const pct = totalPossible ? Math.round((att_i.length / totalPossible) * 100) : 0;
+        last3.push({ label: d.toLocaleDateString('en-IN',{month:'short'}), pct });
+      }
+
       insightsHtml = `
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
-          <div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase">✨ Insights — ${mLabel}</div>
+          <div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase">📈 Monthly Trend</div>
+          <div style="background:var(--card);border-radius:var(--radius-md);padding:14px;border:1px solid var(--glass-border);display:flex;align-items:flex-end;gap:20px;height:100px;justify-content:center">
+            ${last3.map(t => `
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+                <div style="font-size:10px;color:var(--text-3);font-weight:700">${t.pct}%</div>
+                <div style="width:100%;max-width:30px;height:${t.pct}px;background:var(--brand);border-radius:4px;opacity:${t.label===last3[2].label?1:0.4}"></div>
+                <div style="font-size:10px;color:var(--text-2);font-weight:600">${t.label}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;margin-top:6px">✨ Insights — ${mLabel}</div>
           ${perfect.length ? `<div style="background:#F0FDF4;border-radius:var(--radius-md);padding:12px 14px;border-left:4px solid var(--success)">
             <div style="font-size:12px;font-weight:700;color:var(--success);margin-bottom:4px">🏆 100% Attendance</div>
             <div style="font-size:13px;color:var(--text)">${perfect.map(r=>`<b>${r.e.name}</b> <span style="font-size:11px;color:var(--text-3)">(${ROLES[r.e.role]?.label||r.e.role})</span>`).join(' · ')}</div>
@@ -2492,6 +2558,7 @@ function renderSupReportOutput() {
   } else if (supReportType==='role-attend') {
     // Role-wise attendance: group employees by role, show stats per period
     const roleOrder = ['PM','SM','HR','SE','EN','SV','JE','AS','TK'];
+    const roleOrder = ['PM','SM','HR','SE','EN','SV','JE','AS','TK'];
     let periodDates = dates; // default monthly
     let periodLabel = mLabel;
 
@@ -2499,13 +2566,14 @@ function renderSupReportOutput() {
       periodDates = [today()].filter(d=>!isFuture(d));
       periodLabel = `Today — ${formatDate(today())}`;
     } else if (roleReportPeriod === 'weekly') {
-      // Mon–Sun of current week
       const t = new Date(); const dow = t.getDay()||7;
       const mon = new Date(t); mon.setDate(t.getDate()-dow+1);
-      periodDates = Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d.toISOString().slice(0,10); })
-        .filter(d=>!isFuture(d));
+      periodDates = Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d.toISOString().slice(0,10); }).filter(d=>!isFuture(d));
       periodLabel = `Week — ${periodDates[0]?.slice(5)} to ${periodDates[periodDates.length-1]?.slice(5)}`;
     }
+
+    const attMap = new Map();
+    att.forEach(a => { attMap.set(`${a.employeeId}_${a.date}`, a); });
 
     const roleStats = roleOrder.map(role => {
       const group = emps.filter(e=>e.role===role);
@@ -2513,7 +2581,7 @@ function renderSupReportOutput() {
       let totalPresent=0, totalAbsent=0, totalMins=0;
       group.forEach(e => {
         periodDates.forEach(d => {
-          const r = att.find(a=>a.employeeId===e.id && a.date===d);
+          const r = attMap.get(`${e.id}_${d}`);
           if (r) { totalPresent++; totalMins += totalMinsForRec(r); }
           else     totalAbsent++;
         });
@@ -2522,6 +2590,8 @@ function renderSupReportOutput() {
       const pct = totalSlots ? Math.round(totalPresent/totalSlots*100) : 0;
       return { role, label:ROLES[role]?.label||role, count:group.length, totalPresent, totalAbsent, totalMins, pct };
     }).filter(Boolean);
+
+    lastReportData = roleStats.map(r => ({ Role: r.label, Headcount: r.count, Present: r.totalPresent, Absent: r.totalAbsent, Percentage: r.pct + '%', TotalHrs: (r.totalMins/60).toFixed(2) }));
 
     out.innerHTML = `
       <div style="font-size:13px;color:#555;margin-bottom:10px">🏷 Role-wise Attendance — ${periodLabel}</div>
@@ -2552,22 +2622,29 @@ function renderSupReportOutput() {
         return `<td><div class="${AVAIL[r.status]?.cell||''}">${AVAIL[r.status]?.label.split(' ')[0]||r.status}</div></td>`;
       }).join('');
       return `<tr><td><b>${e.name.split(' ')[0]}</b></td>${cells}</tr>`;
-    }).join('');
+    });
     out.innerHTML = `
       <div style="font-size:13px;color:#555;margin-bottom:10px">📅 Team Availability — Next 14 Days</div>
-      <div class="rpt-scroll"><table class="rpt-table">${header}<tbody>${rows}</tbody></table></div>`;
+      <div class="rpt-scroll"><table class="rpt-table">${header}<tbody>${rows.join('')}</tbody></table></div>`;
+    lastReportData = emps.map(e => {
+       const row = { Name: e.name };
+       futureDates.forEach(d => {
+         const r = avail.find(a=>a.employeeId===e.id && a.date===d);
+         row[d] = r ? r.status : '';
+       });
+       return row;
+    });
 
   } else if (supReportType==='labour') {
     const workers  = getLmsWorkers();
     const lmsAll   = getLmsAtt();
-    const lmsDates = dates;
     const rows     = workers.map(w => {
       let present=0, totalMins=0;
-      lmsDates.forEach(d => {
+      dates.forEach(d => {
         const r = lmsAll.find(a=>a.workerId===w.id && a.date===d);
         if (r) { present++; totalMins += minsFromTimes(r.inTime,r.outTime); }
       });
-      return {w, present, absent:lmsDates.length-present, totalMins};
+      return {w, present, absent:dates.length-present, totalMins};
     });
     out.innerHTML = `
       <div style="font-size:13px;color:#555;margin-bottom:10px">👷 Labour Summary — ${mLabel}</div>
@@ -2581,6 +2658,39 @@ function renderSupReportOutput() {
         </tr>`).join('')}</tbody>
       </table></div>
       <div style="font-size:12px;color:#888;margin-top:8px">Labour data read from Labour Management System.</div>`;
+    lastReportData = rows.map(r => ({ Worker: r.w.name, Skill: r.w.skill, Present: r.present, Absent: r.absent, TotalHrs: (r.totalMins/60).toFixed(2) }));
+
+  } else if (supReportType==='payroll') {
+    // Basic Payroll: calculation of days and estimated pay
+    const rows = emps.map(e => {
+      let present=0, totalMins=0;
+      dates.forEach(d => {
+        const r = att.find(a=>a.employeeId===e.id && a.date===d);
+        if (r) { present++; totalMins += totalMinsForRec(r); }
+      });
+      // Mock daily rate if not present
+      const rate = e.salary || 0; 
+      const amount = (present * rate);
+      return { e, present, totalMins, amount };
+    });
+
+    out.innerHTML = `
+      <div style="font-size:13px;color:#555;margin-bottom:10px">💰 Payroll Summary — ${mLabel}</div>
+      <div class="rpt-scroll"><table class="rpt-table">
+        <thead><tr><th>Name</th><th>Role</th><th>Days</th><th>Total Hrs</th><th>Est. Pay</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr>
+          <td><b>${r.e.name}</b></td>
+          <td>${ROLES[r.e.role]?.label||r.e.role}</td>
+          <td style="text-align:center">${r.present}</td>
+          <td class="td-hr">${fmtMins(r.totalMins)}</td>
+          <td style="text-align:right;font-weight:700;color:var(--brand)">₹${r.amount.toLocaleString('en-IN')}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr class="tfoot-row">
+          <td colspan="4"><b>TOTAL PAYABLE</b></td>
+          <td style="text-align:right;font-weight:800;color:var(--brand);font-size:15px">₹${rows.reduce((s,r)=>s+r.amount,0).toLocaleString('en-IN')}</td>
+        </tr></tfoot>
+      </table></div>`;
+    lastReportData = rows.map(r => ({ Name: r.e.name, Role: r.e.role, Days: r.present, TotalHrs: (r.totalMins/60).toFixed(2), Amount: r.amount }));
 
   } else if (supReportType==='scanner') {
     const workers  = getLmsWorkers();
