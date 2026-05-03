@@ -89,9 +89,15 @@
     <div style="display:flex;align-items:center;gap:4px">
       <select id="slim-site-select" onchange="changeActiveSite(this.value)" style="display:none; margin-right: 8px; padding: 2px 4px; border-radius: 4px; border: 1px solid #ccc; background: white; color: black; max-width: 100px;"></select>
       <button id="slim-extra-btn" style="display:none;background:none;border:none;font-size:20px;cursor:pointer;padding:6px;color:var(--brand);line-height:1"></button>
+      <button id="notif-btn" onclick="toggleNotifPanel()" style="position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:6px;color:var(--text-2);line-height:1;-webkit-tap-highlight-color:transparent">
+        🔔<span id="notif-badge" style="display:none;position:absolute;top:2px;right:2px;background:var(--danger);color:#fff;border-radius:99px;font-size:9px;font-weight:800;min-width:16px;height:16px;align-items:center;justify-content:center;padding:0 3px;line-height:16px"></span>
+      </button>
       <div class="user-avatar" id="slim-avatar" onclick="showTab('profile')" style="cursor:pointer;background:var(--brand);color:#fff;border:none;box-shadow:none;width:32px;height:32px;font-size:11px">—</div>
     </div>
   </div>
+
+  <!-- Notification Panel -->
+  <div id="notif-panel" onclick="event.stopPropagation()" style="display:none;position:fixed;top:52px;right:8px;width:calc(100% - 16px);max-width:360px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:var(--radius-md);box-shadow:var(--shadow-float);z-index:800;max-height:70vh;overflow-y:auto"></div>
 
   <nav id="main-nav"></nav>
 
@@ -543,7 +549,47 @@
   </div>
 </div>
 
+<!-- ── ANNOUNCEMENT ── -->
+<div id="modal-announcement" class="modal-overlay" onclick="overlayClose(event,'modal-announcement')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">📢 Post Announcement</span>
+      <button class="modal-close" onclick="closeModal('modal-announcement')">✕</button>
+    </div>
+    <label>Title</label>
+    <input type="text" id="ann-title-inp" placeholder="Announcement title" maxlength="120">
+    <label>Message (optional)</label>
+    <textarea id="ann-body-inp" placeholder="Details, instructions, or notes…" style="min-height:80px"></textarea>
+    <label>Priority</label>
+    <select id="ann-priority-sel">
+      <option value="urgent">🔴 Urgent</option>
+      <option value="important">🟡 Important</option>
+      <option value="normal" selected>🔵 Info</option>
+    </select>
+    <label>Scope</label>
+    <select id="ann-type-sel" onchange="annTypeChange(this.value)">
+      <option value="company">🏢 Company-Wide</option>
+      <option value="site">📍 Specific Site</option>
+    </select>
+    <div id="ann-site-row" style="display:none">
+      <label>Site</label>
+      <select id="ann-site-sel"></select>
+    </div>
+    <button class="btn btn-primary" onclick="createAnnouncement()">Post Announcement</button>
+  </div>
+</div>
+
 <div id="print-area"></div>
+<script>
+  // Close notification panel on outside click
+  document.addEventListener('click', function(e) {
+    const panel = document.getElementById('notif-panel');
+    const btn   = document.getElementById('notif-btn');
+    if (panel && panel.style.display !== 'none' && !panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+      closeNotifPanel();
+    }
+  });
+</script>
 <script src="supervisor.js"></script>
 </body>
 </html>

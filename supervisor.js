@@ -287,7 +287,14 @@ const getLmsWorkers = () => filterBySite(DB.lmsWorkers);
 const getLmsAtt     = () => filterBySite(DB.lmsAtt);
 const getMessages   = () => filterBySite(DB.messages);
 const getContacts   = () => filterBySite(DB.contacts);
-const getGroups     = () => filterBySite(DB.groups);
+const getGroups        = () => filterBySite(DB.groups);
+const getAnnouncements = () => {
+  const sess   = getSession();
+  const anns   = DB.announcements || [];
+  if (!sess) return anns;
+  const siteId = getActiveSiteId();
+  return anns.filter(a => !a.type || a.type === 'company' || a.site_id === siteId);
+};
 
 const saveEmployees  = async d => { DB.employees   = d; await sbUpsert('employees',  d); };
 const saveUsers      = async d => { DB.users       = d; await sbUpsert('users',      d); };
@@ -300,6 +307,171 @@ const saveLmsAtt     = async d => { DB.lmsAtt      = d; await sbUpsert('lms_atte
 const saveMessages   = async d => { DB.messages    = d; await sbUpsert('messages',   d); };
 const saveContacts   = async d => { DB.contacts    = d; await sbUpsert('contacts',   d); };
 const saveGroups     = async d => { DB.groups      = d; await sbUpsert('groups',     d); };
+
+// ══════════════════════════════════════════════════════════
+// ANNOUNCEMENTS
+// ══════════════════════════════════════════════════════════
+function announcementCard(a) {
+  const emp     = (DB.employees||[]).find(e => e.id === a.createdBy);
+  const byName  = emp ? emp.name.split(' ')[0] : 'Admin';
+  const pri     = a.priority || 'normal';
+  const priCls  = pri === 'urgent' ? 'ann-urgent' : pri === 'important' ? 'ann-important' : 'ann-normal';
+  const priLbl  = pri === 'urgent' ? '🔴 Urgent' : pri === 'important' ? '🟡 Important' : '🔵 Info';
+  const scope   = a.type === 'site'
+    ? `📍 ${(DB.sites||[]).find(s => s.id === a.site_id)?.name || 'Site'}`
+    : '🏢 Company-Wide';
+  const ts      = a.createdAt ? new Date(a.createdAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '';
+  return `<div class="ann-card ${priCls}">
+    <div class="ann-meta">
+      <span class="ann-pri-badge">${priLbl}</span>
+      <span class="ann-scope">${scope}</span>
+      <span class="ann-ts">${ts}</span>
+    </div>
+    <div class="ann-title">${a.title}</div>
+    ${a.body ? `<div class="ann-body">${a.body}</div>` : ''}
+    <div class="ann-by">— ${byName}</div>
+  </div>`;
+}
+
+function openCreateAnnouncement() {
+  const sess = getSession();
+  if (!['PM','SM','HR','SU'].includes(sess?.role)) return;
+  document.getElementById('ann-title-inp').value   = '';
+  document.getElementById('ann-body-inp').value    = '';
+  document.getElementById('ann-priority-sel').value= 'normal';
+  document.getElementById('ann-type-sel').value    = 'company';
+  const siteRow = document.getElementById('ann-site-row');
+  if (siteRow) siteRow.style.display = 'none';
+  // Populate site selector
+  const sel = document.getElementById('ann-site-sel');
+  if (sel) {
+    const sites = DB.sites || [];
+    sel.innerHTML = sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  }
+  openModal('modal-announcement');
+}
+
+function annTypeChange(val) {
+  const row = document.getElementById('ann-site-row');
+  if (row) row.style.display = val === 'site' ? 'block' : 'none';
+}
+
+async function createAnnouncement() {
+  const sess     = getSession();
+  const title    = document.getElementById('ann-title-inp').value.trim();
+  const body     = document.getElementById('ann-body-inp').value.trim();
+  const priority = document.getElementById('ann-priority-sel').value;
+  const type     = document.getElementById('ann-type-sel').value;
+  const siteId   = type === 'site' ? document.getElementById('ann-site-sel')?.value || null : null;
+  if (!title) { showToast('Title is required', 'error'); return; }
+  const ann = {
+    id:        'ANN' + Date.now(),
+    title, body, priority,
+    type:      type || 'company',
+    site_id:   siteId,
+    createdBy: getCurrentEmp()?.id || null,
+    createdAt: new Date().toISOString(),
+    company_id: sess.companyId
+  };
+  DB.announcements.push(ann);
+  await sbUpsert('announcements', [ann]);
+  closeModal('modal-announcement');
+  showToast('Announcement posted ✓', 'success');
+  renderDashboard();
+  updateNotificationBadge();
+}
+// ══════════════════════════════════════════════════════════
+// NOTIFICATION BELL
+// ══════════════════════════════════════════════════════════
+function computeNotifications() {
+  const emp  = getCurrentEmp();
+  const sess = getSession();
+  if (!emp || !sess) return [];
+  const notifs   = [];
+  const todayStr = today();
+
+  // Overdue tasks assigned to me
+  getTasks()
+    .filter(t => t.assignedTo === emp.id && t.status !== 'completed' && t.dueDate && t.dueDate < todayStr)
+    .forEach(t => notifs.push({ id:'OD'+t.id, icon:'🔴', title:'Overdue Task', body:t.title, action:'work' }));
+
+  // Due today
+  getTasks()
+    .filter(t => t.assignedTo === emp.id && t.status !== 'completed' && t.dueDate === todayStr)
+    .forEach(t => notifs.push({ id:'DT'+t.id, icon:'🟡', title:'Due Today', body:t.title, action:'work' }));
+
+  // Unread announcements
+  const readKey  = 'readAnns_' + emp.id;
+  const readAnns = JSON.parse(localStorage.getItem(readKey) || '[]');
+  getAnnouncements().forEach(a => {
+    if (!readAnns.includes(a.id)) {
+      notifs.push({ id:'AN'+a.id, annId:a.id, icon:'📢', title:a.title, body:a.body || '', action:'ann', empId:emp.id });
+    }
+  });
+
+  // Pending punch requests (managers only)
+  if (['PM','SM','HR','SU'].includes(sess.role)) {
+    const pending = (DB.punchRequests||[]).filter(r => r.status === 'pending');
+    if (pending.length > 0) {
+      notifs.push({ id:'PR', icon:'⏰', title:`${pending.length} Punch Request${pending.length>1?'s':''}`, body:'Corrections awaiting your review', action:'requests' });
+    }
+  }
+
+  return notifs;
+}
+
+function updateNotificationBadge() {
+  const badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  const count = computeNotifications().length;
+  badge.textContent = count > 9 ? '9+' : String(count);
+  badge.style.display = count > 0 ? 'flex' : 'none';
+}
+
+function markAnnRead(annId, empId) {
+  const key      = 'readAnns_' + empId;
+  const readAnns = JSON.parse(localStorage.getItem(key) || '[]');
+  if (!readAnns.includes(annId)) { readAnns.push(annId); localStorage.setItem(key, JSON.stringify(readAnns)); }
+  updateNotificationBadge();
+}
+
+let _notifOpen = false;
+function toggleNotifPanel() {
+  _notifOpen = !_notifOpen;
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  if (!_notifOpen) { panel.style.display = 'none'; return; }
+
+  const notifs = computeNotifications();
+  const emp    = getCurrentEmp();
+  if (notifs.length === 0) {
+    panel.innerHTML = `<div class="notif-empty">🎉 All caught up!</div>`;
+  } else {
+    panel.innerHTML = notifs.map(n => `
+      <div class="notif-item notif-${n.action}" onclick="handleNotifTap('${n.id}','${n.action}','${n.annId||''}','${n.empId||''}')">
+        <div class="notif-icon">${n.icon}</div>
+        <div class="notif-text">
+          <div class="notif-title">${n.title}</div>
+          ${n.body ? `<div class="notif-body">${n.body.slice(0,60)}${n.body.length>60?'…':''}</div>` : ''}
+        </div>
+      </div>`).join('');
+  }
+  panel.style.display = 'block';
+}
+
+function handleNotifTap(id, action, annId, empId) {
+  closeNotifPanel();
+  if (action === 'work')     showTab('work');
+  if (action === 'requests') { showTab('schedule'); setTimeout(() => switchSchedTab('requests'), 50); }
+  if (action === 'ann' && annId && empId) markAnnRead(annId, empId);
+}
+
+function closeNotifPanel() {
+  _notifOpen = false;
+  const panel = document.getElementById('notif-panel');
+  if (panel) panel.style.display = 'none';
+}
+
 const getPunchRequests  = () => filterBySite(DB.punchRequests);
 const savePunchRequests = async d => { DB.punchRequests = d; await sbUpsert('punch_requests', d); };
 
@@ -753,6 +925,7 @@ function showApp() {
 
   buildNav();
   updateMsgBadge();
+  updateNotificationBadge();
   showTab('dashboard');
   // Run seed migrations in background after login
   setTimeout(() => seedData().catch(console.error), 1800);
@@ -1076,22 +1249,80 @@ function availBadge(s) {
 // DASHBOARD
 // ══════════════════════════════════════════════════════════
 function renderDashboard() {
+  const role = getSession()?.role || '';
+  if (role === 'SU')                        renderSUDashboard();
+  else if (['PM','SM','HR'].includes(role)) renderMgrDashboard();
+  else                                      renderEmpDashboard();
+  updateNotificationBadge();
+}
+
+// ── Superadmin Dashboard ──────────────────────────────────
+function renderSUDashboard() {
+  const companies = DB.companies || [];
+  const allEmps   = DB.employees || [];
+  const todayStr  = today();
+  const att       = DB.attendance || [];
+  const checkedIn = new Set(att.filter(a => a.date === todayStr).map(a => a.employeeId)).size;
+
+  let html = `
+    <div class="dash-hero" style="background:linear-gradient(135deg,#1e293b,#334155)">
+      <div class="hero-greet">Superadmin Panel 🌐</div>
+      <div class="hero-sub">${formatDate(todayStr)}</div>
+    </div>
+    <div class="stat-grid cols3">
+      <div class="stat-box"><div class="sv sv-blue">${companies.length}</div><div class="sl">Companies</div></div>
+      <div class="stat-box"><div class="sv sv-green">${allEmps.length}</div><div class="sl">Total Staff</div></div>
+      <div class="stat-box"><div class="sv sv-orange">${checkedIn}</div><div class="sl">Checked In</div></div>
+    </div>
+    <div class="dash-section-hdr">
+      <span>Companies</span>
+      <button class="btn-sm btn-primary" onclick="showTab('admin')">Manage →</button>
+    </div>`;
+
+  companies.forEach(c => {
+    const cEmps  = allEmps.filter(e => e.company_id === c.id);
+    const cIn    = new Set(att.filter(a => a.date === todayStr && cEmps.find(e => e.id === a.employeeId)).map(a => a.employeeId)).size;
+    const sites  = (DB.sites||[]).filter(s => s.company_id === c.id);
+    html += `<div class="ann-card ann-normal" style="cursor:pointer" onclick="showTab('admin')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <div style="font-weight:700;font-size:15px">🏢 ${c.name}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:3px">${sites.length} site${sites.length!==1?'s':''} · ${cEmps.length} employee${cEmps.length!==1?'s':''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:18px;font-weight:800;color:var(--success)">${cIn}</div>
+          <div style="font-size:10px;color:var(--text-3)">in today</div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('dash-content').innerHTML = html;
+}
+
+// ── Manager Dashboard (PM / SM / HR) ─────────────────────
+function renderMgrDashboard() {
   const emp      = getCurrentEmp();
   const role     = getSession()?.role || '';
+  const todayStr = today();
   const att      = getSupAtt();
-  const todayRec = att.find(a => a.employeeId===emp.id && a.date===today());
-  const tasks    = getTasks().filter(t => t.assignedTo===emp.id && t.status!=='completed');
-  const lmsAtt   = getLmsAtt().filter(a => a.date===today());
+  const todayRec = att.find(a => a.employeeId === emp.id && a.date === todayStr);
+  const lmsAtt   = getLmsAtt().filter(a => a.date === todayStr);
+  const allTasks = getTasks();
+  const openTasks    = allTasks.filter(t => t.status !== 'completed');
+  const overdueTasks = openTasks.filter(t => t.dueDate && t.dueDate < todayStr);
+  const empPresent   = new Set(att.filter(a => a.date === todayStr).map(a => a.employeeId)).size;
+  const pendingReqs  = (DB.punchRequests||[]).filter(r => r.status === 'pending');
+  const labourIn     = lmsAtt.filter(a => !a.outTime).length;
 
-  // Hero attendance button (multi-punch)
-  let attBtn = '';
-  let heroStatus = '';
-  const currentlyIN = isCurrentlyIN(todayRec);
-  const lp = lastPunch(todayRec);
-  if (!todayRec || !todayRec.punches || todayRec.punches.length === 0) {
+  // Hero attendance button
+  const curIN  = isCurrentlyIN(todayRec);
+  const lp     = lastPunch(todayRec);
+  let attBtn   = '', heroStatus = '';
+  if (!todayRec || !todayRec.punches?.length) {
     attBtn = `<button class="hero-att-btn in" onclick="markSelfIN()">▲ Mark Attendance IN</button>`;
     heroStatus = `<div class="hero-status">You haven't marked IN today</div>`;
-  } else if (currentlyIN) {
+  } else if (curIN) {
     attBtn = `<button class="hero-att-btn out" onclick="markSelfOUT()">▼ Mark OUT</button>`;
     heroStatus = `<div class="hero-status">✓ Checked in at ${lp.inTime}</div>`;
   } else {
@@ -1102,49 +1333,137 @@ function renderDashboard() {
   let html = `
     <div class="dash-hero">
       <div class="hero-greet">Good ${greet()}, ${emp.name.split(' ')[0]}! 👋</div>
-      <div class="hero-sub">${ROLES[role]?.label} &nbsp;·&nbsp; ${formatDate(today())}</div>
-      ${heroStatus}
-      ${attBtn}
+      <div class="hero-sub">${ROLES[role]?.label} &nbsp;·&nbsp; ${formatDate(todayStr)}</div>
+      ${heroStatus}${attBtn}
+    </div>
+    <div class="stat-grid cols2">
+      <div class="stat-box"><div class="sv sv-green">${empPresent}</div><div class="sl">Staff In</div></div>
+      <div class="stat-box"><div class="sv sv-orange">${openTasks.length}</div><div class="sl">Open Tasks</div></div>
+    </div>
+    <div class="stat-grid cols3">
+      <div class="stat-box" style="cursor:pointer" onclick="showTab('work')">
+        <div class="sv sv-red">${overdueTasks.length}</div><div class="sl">Overdue</div>
+      </div>
+      <div class="stat-box"><div class="sv sv-blue">${labourIn}</div><div class="sl">Labour In</div></div>
+      <div class="stat-box" style="cursor:pointer" onclick="showTab('schedule');switchSchedTab('requests')">
+        <div class="sv sv-orange">${pendingReqs.length}</div><div class="sl">Requests</div>
+      </div>
     </div>`;
 
-  // Stats row
-  const unreadMsgs = getMessages().filter(m=>m.to===emp.id&&!m.read).length;
-  html += `<div class="stat-grid">
-    <div class="stat-box"><div class="sv sv-blue">${tasks.length}</div><div class="sl">My Tasks</div></div>
-    <div class="stat-box"><div class="sv sv-orange">${unreadMsgs}</div><div class="sl">Unread Msgs</div></div>
+  // Announcements section
+  const anns = getAnnouncements().slice().sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,3);
+  html += `<div class="dash-section-hdr">
+    <span>📢 Announcements</span>
+    <button class="btn-sm btn-primary" onclick="openCreateAnnouncement()">+ Post</button>
   </div>`;
+  if (anns.length === 0) {
+    html += `<div class="empty-state-sm">No announcements yet. Post one to keep the team informed.</div>`;
+  } else {
+    html += anns.map(a => announcementCard(a)).join('');
+  }
 
-  if (hasAccess('reports')) {
-    const empPres   = new Set(att.filter(a=>a.date===today()).map(a=>a.employeeId)).size;
-    const openTasks = getTasks().filter(t=>t.status!=='completed').length;
-    const labourIn  = lmsAtt.filter(a=>!a.outTime).length;
-    html += `<div class="stat-grid cols3">
-      <div class="stat-box"><div class="sv sv-green">${empPres}</div><div class="sl">Staff In</div></div>
-      <div class="stat-box"><div class="sv sv-orange">${openTasks}</div><div class="sl">Open Tasks</div></div>
-      <div class="stat-box"><div class="sv sv-blue">${labourIn}</div><div class="sl">Labour In</div></div>
+  // Overdue tasks
+  if (overdueTasks.length > 0) {
+    html += `<div class="dash-section-hdr" style="margin-top:6px"><span>⚠️ Overdue Tasks</span><button class="btn-sm" onclick="showTab('work')">See All</button></div>`;
+    html += overdueTasks.slice(0,3).map(t => {
+      const assignee = getEmployees().find(e => e.id === t.assignedTo);
+      return `<div class="task-card high" style="cursor:pointer" onclick="openTaskDetail('${t.id}')">
+        <div class="task-title">${t.title}</div>
+        <div class="task-footer">
+          ${priorityBadge(t.priority)} ${statusBadge(t.status)}
+          <span style="font-size:11px;color:var(--danger)">Due: ${t.dueDate}</span>
+          ${assignee ? `<span style="font-size:11px;color:var(--text-3)">→ ${assignee.name.split(' ')[0]}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('dash-content').innerHTML = html;
+}
+
+// ── Employee Dashboard ────────────────────────────────────
+function renderEmpDashboard() {
+  const emp      = getCurrentEmp();
+  const role     = getSession()?.role || '';
+  const todayStr = today();
+  const att      = getSupAtt();
+  const todayRec = att.find(a => a.employeeId === emp.id && a.date === todayStr);
+  const myTasks  = getTasks().filter(t => t.assignedTo === emp.id && t.status !== 'completed');
+  const overdue  = myTasks.filter(t => t.dueDate && t.dueDate < todayStr);
+  const dueToday = myTasks.filter(t => t.dueDate === todayStr);
+  const unread   = getMessages().filter(m => m.to === emp.id && !m.read).length;
+
+  // Month attendance %
+  const monthStart = todayStr.slice(0,7) + '-01';
+  const daysElapsed = parseInt(todayStr.slice(8)) || 1;
+  const monthDays   = att.filter(a => a.employeeId === emp.id && a.date >= monthStart && a.date <= todayStr);
+  const attPct      = Math.round((monthDays.length / daysElapsed) * 100);
+
+  // Hero attendance
+  const curIN  = isCurrentlyIN(todayRec);
+  const lp     = lastPunch(todayRec);
+  let attBtn   = '', heroStatus = '';
+  if (!todayRec || !todayRec.punches?.length) {
+    attBtn = `<button class="hero-att-btn in" onclick="markSelfIN()">▲ Mark Attendance IN</button>`;
+    heroStatus = `<div class="hero-status">You haven't marked IN today</div>`;
+  } else if (curIN) {
+    attBtn = `<button class="hero-att-btn out" onclick="markSelfOUT()">▼ Mark OUT</button>`;
+    heroStatus = `<div class="hero-status">✓ Checked in at ${lp.inTime}</div>`;
+  } else {
+    attBtn = `<button class="hero-att-btn in" onclick="markSelfIN()">▲ Mark IN Again</button>`;
+    heroStatus = `<div class="hero-status">Total today: ${fmtMins(totalMinsForRec(todayRec))}</div>`;
+  }
+
+  let html = `
+    <div class="dash-hero">
+      <div class="hero-greet">Good ${greet()}, ${emp.name.split(' ')[0]}! 👋</div>
+      <div class="hero-sub">${ROLES[role]?.label} &nbsp;·&nbsp; ${formatDate(todayStr)}</div>
+      ${heroStatus}${attBtn}
+    </div>
+    <div class="stat-grid cols3">
+      <div class="stat-box" style="cursor:pointer" onclick="showTab('work')">
+        <div class="sv sv-blue">${myTasks.length}</div><div class="sl">My Tasks</div>
+      </div>
+      <div class="stat-box" style="cursor:pointer" onclick="showTab('messages')">
+        <div class="sv sv-orange">${unread}</div><div class="sl">Unread</div>
+      </div>
+      <div class="stat-box"><div class="sv sv-green">${attPct}%</div><div class="sl">Month Att.</div></div>
+    </div>`;
+
+  // Task reminders (overdue + due today)
+  if (overdue.length > 0) {
+    html += `<div class="task-reminder overdue-banner" onclick="showTab('work')">
+      <span>🔴 ${overdue.length} overdue task${overdue.length>1?'s':''}: ${overdue.map(t=>t.title).slice(0,2).join(', ')}${overdue.length>2?'…':''}</span>
+      <span class="reminder-arrow">›</span>
+    </div>`;
+  }
+  if (dueToday.length > 0) {
+    html += `<div class="task-reminder duetoday-banner" onclick="showTab('work')">
+      <span>🟡 Due today: ${dueToday.map(t=>t.title).slice(0,2).join(', ')}${dueToday.length>2?'…':''}</span>
+      <span class="reminder-arrow">›</span>
     </div>`;
   }
 
-  // My Pad quick button
-  const padNotes = getPadItems();
-  html += `
-    <button onclick="showTab('mypad')"
-      style="display:flex;align-items:center;justify-content:space-between;width:100%;
-             background:#F0F6FF;border:1.5px solid #DBEAFE;border-radius:var(--radius-md);
-             padding:12px 14px;cursor:pointer;margin-bottom:14px;text-align:left">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:16px">📝</span>
-        <span style="font-size:14px;font-weight:700;color:var(--brand)">My Pad</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:12px;color:var(--text-3)">${padNotes.length} note${padNotes.length===1?'':'s'}</span>
-        <span style="color:var(--text-3);font-size:16px">›</span>
-      </div>
-    </button>`;
+  // Announcements
+  const anns = getAnnouncements().slice().sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,2);
+  if (anns.length > 0) {
+    html += `<div class="dash-section-hdr"><span>📢 Announcements</span></div>`;
+    html += anns.map(a => announcementCard(a)).join('');
+  }
 
-  if (tasks.length) {
-    html += `<h3 style="margin:16px 0 10px">My Pending Tasks</h3>`;
-    html += tasks.slice(0,3).map(t => `
+  // Quick nav
+  const padCount = getPadItems().length;
+  html += `<div class="dash-quick-grid">
+    <div class="dash-quick-btn" onclick="showTab('schedule')"><span>📅</span><span>Schedule</span></div>
+    <div class="dash-quick-btn" onclick="showTab('mypad')"><span>📝</span><span>My Pad${padCount?' ('+padCount+')':''}</span></div>
+    <div class="dash-quick-btn" onclick="showTab('people')"><span>👷</span><span>Crew</span></div>
+    <div class="dash-quick-btn" onclick="showTab('reports')"><span>📊</span><span>Reports</span></div>
+  </div>`;
+
+  // Pending tasks
+  if (myTasks.length > 0) {
+    html += `<div class="dash-section-hdr"><span>📋 My Tasks</span><button class="btn-sm" onclick="showTab('work')">All</button></div>`;
+    html += myTasks.slice(0,4).map(t => `
       <div class="task-card ${t.priority}" style="cursor:pointer" onclick="openTaskDetail('${t.id}')">
         <div class="task-title">${t.title}</div>
         <div class="task-footer">

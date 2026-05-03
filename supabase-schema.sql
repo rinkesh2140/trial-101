@@ -198,9 +198,12 @@ CREATE TABLE IF NOT EXISTS announcements (
   id          TEXT PRIMARY KEY,
   title       TEXT,
   body        TEXT,
+  type        TEXT DEFAULT 'company',
+  priority    TEXT DEFAULT 'normal',
   "createdBy" TEXT,
   "createdAt" TEXT,
-  company_id  UUID
+  company_id  UUID,
+  site_id     UUID
 );
 
 -- Employee ↔ Site assignments (many-to-many)
@@ -260,3 +263,10 @@ CREATE POLICY "allow_all" ON punch_requests   FOR ALL TO anon, authenticated USI
 CREATE POLICY "allow_all" ON announcements    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "allow_all" ON employee_sites   FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "allow_all" ON meta             FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- ════════════════════════════════════════════════════════
+-- MIGRATIONS — safe to re-run (IF NOT EXISTS / idempotent)
+-- ════════════════════════════════════════════════════════
+ALTER TABLE announcements ADD COLUMN IF NOT EXISTS type     TEXT DEFAULT 'company';
+ALTER TABLE announcements ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'normal';
+ALTER TABLE announcements ADD COLUMN IF NOT EXISTS site_id  UUID;
