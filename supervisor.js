@@ -855,7 +855,7 @@ async function initAuth() {
     await supabaseClient.from('employees').upsert([{
       id: 'SU001', name: 'Superadmin', role: 'SU',
       designation: 'Super Administrator',
-      active: true, status: 'active', avatar: 'SA', joinDate: today()
+      active: true, status: 'active', avatar: 'SA'
     }], { onConflict: 'id' });
 
     // Always keep superadmin password in sync (delete + insert because username has no UNIQUE constraint)
@@ -878,7 +878,7 @@ async function initAuth() {
           id: 'ADM001', name: 'Admin', role: 'PM',
           designation: 'Project Manager', department: 'Management',
           avatar: 'AD', active: true, status: 'active',
-          joinDate: today(), company_id: compId
+          company_id: compId
         }], { onConflict: 'id' });
         await supabaseClient.from('users').insert([{ username: 'admin', password: 'Admin@123', role: 'PM', employee_id: 'ADM001', company_id: compId }]);
       }
@@ -917,7 +917,7 @@ async function firstTimeSetup() {
       id: 'ADM001', name: 'Admin', role: 'PM',
       designation: 'Project Manager', department: 'Management',
       avatar: 'AD', active: true, status: 'active',
-      joinDate: today(), company_id: compId
+      company_id: compId
     }]);
     await supabaseClient.from('users').upsert([{
       username: 'admin', password: 'Admin@123',
