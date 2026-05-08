@@ -851,23 +851,19 @@ async function initAuth() {
     const { data: compData, error: ce } = await supabaseClient.from('companies').select('id').limit(1);
     if (ce) throw new Error('Cannot reach database: ' + ce.message);
 
-    // 2. Always ensure SU employee and superadmin user exist with correct credentials
+    // 2. Always ensure SU001 employee exists
     await supabaseClient.from('employees').upsert([{
       id: 'SU001', name: 'Superadmin', role: 'SU',
       designation: 'Super Administrator',
       active: true, status: 'active', avatar: 'SA', joinDate: today()
     }], { onConflict: 'id' });
 
-    // Upsert by username so password is always in sync
-    const { data: suRow } = await supabaseClient.from('users')
-      .select('id').eq('username', 'superadmin').single();
-    if (suRow) {
-      await supabaseClient.from('users')
-        .update({ password: 'Super@Admin123', role: 'SU', employee_id: 'SU001' })
-        .eq('username', 'superadmin');
+    // Always keep superadmin password in sync (delete + insert because username has no UNIQUE constraint)
+    const { data: suRows } = await supabaseClient.from('users').select('id').eq('username', 'superadmin');
+    if (suRows && suRows.length > 0) {
+      await supabaseClient.from('users').update({ password: 'Super@Admin123', role: 'SU', employee_id: 'SU001' }).eq('username', 'superadmin');
     } else {
-      await supabaseClient.from('users')
-        .insert([{ username: 'superadmin', password: 'Super@Admin123', role: 'SU', employee_id: 'SU001' }]);
+      await supabaseClient.from('users').insert([{ username: 'superadmin', password: 'Super@Admin123', role: 'SU', employee_id: 'SU001' }]);
     }
 
     // 3. First-time setup if no companies yet
@@ -876,17 +872,15 @@ async function initAuth() {
     } else {
       // Ensure admin account exists for the first company
       const compId = compData[0].id;
-      const { data: adminRow } = await supabaseClient.from('users')
-        .select('id').eq('username', 'admin').single();
-      if (!adminRow) {
+      const { data: adminRows } = await supabaseClient.from('users').select('id').eq('username', 'admin');
+      if (!adminRows || adminRows.length === 0) {
         await supabaseClient.from('employees').upsert([{
           id: 'ADM001', name: 'Admin', role: 'PM',
           designation: 'Project Manager', department: 'Management',
           avatar: 'AD', active: true, status: 'active',
           joinDate: today(), company_id: compId
         }], { onConflict: 'id' });
-        await supabaseClient.from('users')
-          .insert([{ username: 'admin', password: 'Admin@123', role: 'PM', employee_id: 'ADM001', company_id: compId }]);
+        await supabaseClient.from('users').insert([{ username: 'admin', password: 'Admin@123', role: 'PM', employee_id: 'ADM001', company_id: compId }]);
       }
     }
 

@@ -1,74 +1,45 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- Patel Infrastructure — Bootstrap Accounts
--- Run this ONCE in Supabase SQL Editor to create the two starter accounts.
+-- Paste this into Supabase SQL Editor and click RUN
+-- Safe to re-run at any time
 -- ════════════════════════════════════════════════════════════════════════
 
--- Step 1: Create the company
-INSERT INTO companies (id, name)
-VALUES (gen_random_uuid(), 'Patel Infrastructure Pvt. Ltd.')
-ON CONFLICT DO NOTHING;
-
--- Step 2: Create a default site (linked to the company created above)
--- Run after Step 1; replace <COMPANY_UUID> with the actual UUID from the companies table.
--- INSERT INTO sites (name, company_id) VALUES ('Default Site', '<COMPANY_UUID>');
-
--- ════════════════════════════════════════════════════════════════
--- SUPERADMIN — no company (has visibility across all companies)
--- Login: superadmin / Super@Admin123
--- ════════════════════════════════════════════════════════════════
-INSERT INTO employees (id, name, role, designation, avatar, active, status, "joinDate")
-VALUES ('SU001', 'Superadmin', 'SU', 'Super Administrator', 'SA', true, 'active', CURRENT_DATE)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO users (username, password, role, employee_id)
-VALUES ('superadmin', 'Super@Admin123', 'SU', 'SU001')
-ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password;
-
--- ════════════════════════════════════════════════════════════════
--- ADMIN — Project Manager for the company
--- Login: admin / Admin@123
--- Replace <COMPANY_UUID> with the UUID from the companies table.
--- ════════════════════════════════════════════════════════════════
--- INSERT INTO employees (id, name, role, designation, avatar, active, status, "joinDate", company_id)
--- VALUES ('ADM001', 'Admin', 'PM', 'Project Manager', 'AD', true, 'active', CURRENT_DATE, '<COMPANY_UUID>');
-
--- INSERT INTO users (username, password, role, employee_id, company_id)
--- VALUES ('admin', 'Admin@123', 'PM', 'ADM001', '<COMPANY_UUID>')
--- ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password;
-
--- ════════════════════════════════════════════════════════════════
--- QUICK SETUP (all-in-one, uses a CTE to generate the UUID once)
--- ════════════════════════════════════════════════════════════════
 DO $$
 DECLARE
   comp_id UUID;
 BEGIN
-  -- Get or create company
+
+  -- ── Step 1: Get or create company ──────────────────────────────────
   SELECT id INTO comp_id FROM companies LIMIT 1;
   IF comp_id IS NULL THEN
-    INSERT INTO companies (name) VALUES ('Patel Infrastructure Pvt. Ltd.') RETURNING id INTO comp_id;
-    INSERT INTO sites (name, company_id) VALUES ('Default Site', comp_id);
+    INSERT INTO companies (name)
+    VALUES ('Patel Infrastructure Pvt. Ltd.')
+    RETURNING id INTO comp_id;
+
+    INSERT INTO sites (name, company_id)
+    VALUES ('Default Site', comp_id);
   END IF;
+  RAISE NOTICE 'Company ID: %', comp_id;
 
-  -- Superadmin employee (no company_id — cross-company visibility)
+  -- ── Step 2: Superadmin employee (no company — cross-tenant) ────────
+  DELETE FROM employees WHERE id = 'SU001';
   INSERT INTO employees (id, name, role, designation, avatar, active, status, "joinDate")
-  VALUES ('SU001', 'Superadmin', 'SU', 'Super Administrator', 'SA', true, 'active', CURRENT_DATE)
-  ON CONFLICT (id) DO NOTHING;
+  VALUES ('SU001', 'Superadmin', 'SU', 'Super Administrator', 'SA', true, 'active', CURRENT_DATE);
 
-  -- Superadmin user
+  -- ── Step 3: Superadmin user ─────────────────────────────────────────
+  DELETE FROM users WHERE username = 'superadmin';
   INSERT INTO users (username, password, role, employee_id)
-  VALUES ('superadmin', 'Super@Admin123', 'SU', 'SU001')
-  ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password;
+  VALUES ('superadmin', 'Super@Admin123', 'SU', 'SU001');
 
-  -- Admin employee (PM role, tied to company)
+  -- ── Step 4: Admin employee (PM role, tied to company) ───────────────
+  DELETE FROM employees WHERE id = 'ADM001';
   INSERT INTO employees (id, name, role, designation, avatar, active, status, "joinDate", company_id)
-  VALUES ('ADM001', 'Admin', 'PM', 'Project Manager', 'AD', true, 'active', CURRENT_DATE, comp_id)
-  ON CONFLICT (id) DO NOTHING;
+  VALUES ('ADM001', 'Admin', 'PM', 'Project Manager', 'AD', true, 'active', CURRENT_DATE, comp_id);
 
-  -- Admin user
+  -- ── Step 5: Admin user ──────────────────────────────────────────────
+  DELETE FROM users WHERE username = 'admin';
   INSERT INTO users (username, password, role, employee_id, company_id)
-  VALUES ('admin', 'Admin@123', 'PM', 'ADM001', comp_id)
-  ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password;
+  VALUES ('admin', 'Admin@123', 'PM', 'ADM001', comp_id);
 
-  RAISE NOTICE 'Bootstrap complete. Company ID: %', comp_id;
+  RAISE NOTICE 'Done. Login: superadmin / Super@Admin123  |  admin / Admin@123';
 END $$;
