@@ -857,10 +857,10 @@ async function initAuth() {
       await supabaseClient.from('employees').upsert([{
         id:'SU001', name:'Superadmin', role:'SU',
         designation:'Super Administrator',
-        active:true, status:'active', avatar:'SU', joinDate:today()
+        active:true, status:'active', avatar:'SA', joinDate:today()
       }]);
       await supabaseClient.from('users').upsert([{
-        username:'superadmin', password:'su@admin123',
+        username:'superadmin', password:'Super@Admin123',
         role:'SU', employee_id:'SU001'
       }]);
     }
@@ -894,17 +894,25 @@ async function firstTimeSetup() {
     const compId = comp.id;
 
     await supabaseClient.from('sites')
-      .insert([{ name: 'Surat Smart City Road Project', company_id: compId }]);
+      .insert([{ name: 'Default Site', company_id: compId }]);
 
-    // Temp session so sbUpsert injects company_id into all seed records
-    sessionStorage.setItem('sup_session', JSON.stringify({ companyId: compId, role: 'PM', employeeId: 'EMP001' }));
-    await seedData();
-    sessionStorage.removeItem('sup_session');
+    // Create admin (PM) employee and user for this company
+    await supabaseClient.from('employees').upsert([{
+      id: 'ADM001', name: 'Admin', role: 'PM',
+      designation: 'Project Manager', department: 'Management',
+      avatar: 'AD', active: true, status: 'active',
+      joinDate: today(), company_id: compId
+    }]);
+    await supabaseClient.from('users').upsert([{
+      username: 'admin', password: 'Admin@123',
+      role: 'PM', employee_id: 'ADM001', company_id: compId
+    }]);
+
+    await supabaseClient.from('meta').upsert([{ key: 'config', seeded: true, company_id: compId }], { onConflict: 'key' });
     if (loaderSub) loaderSub.textContent = 'Setup complete — please login';
-    console.log('✓ First-time setup done. Login: rajesh.patel / admin123');
+    console.log('✓ First-time setup done. Login: admin / Admin@123');
   } catch(err) {
     console.error('firstTimeSetup error:', err);
-    sessionStorage.removeItem('sup_session');
   }
 }
 
@@ -963,8 +971,6 @@ function showApp() {
   updateMsgBadge();
   updateNotificationBadge();
   showTab('dashboard');
-  // Run seed migrations in background after login
-  setTimeout(() => seedData().catch(console.error), 1800);
 }
 
 function changeActiveSite(siteId) {
@@ -3635,362 +3641,6 @@ async function deleteContact(id) {
 }
 
 // ══════════════════════════════════════════════════════════
-// SEED DATA
-// ══════════════════════════════════════════════════════════
-async function seedData() {
-  // Quick exit if fully seeded
-  const _allEmps = getEmployees();
-  if (_allEmps.length >= 19 && _allEmps.find(e => e.bloodGroup)) return;
-
-  // v4: add extended profile fields (blood group, birthdate, address, vehicle) to all employees
-  const existingEmps4 = getEmployees();
-  if (existingEmps4.length > 0 && !existingEmps4.find(e => e.bloodGroup)) {
-    const profilePatch = {
-      EMP001: { bloodGroup:'B+',  birthDate:'1980-07-15', address:'Block A, Hari Om Society, Varachha Road, Surat', pincode:'395006', vehicle:'GJ05AK7892', priorExpYears:8 },
-      EMP002: { bloodGroup:'O+',  birthDate:'1983-03-22', address:'14, Nilam Park, Katargam, Surat',               pincode:'395004', vehicle:'GJ05BK2341', priorExpYears:5 },
-      EMP003: { bloodGroup:'A+',  birthDate:'1985-11-08', address:'22, Shreeji Nagar, Adajan, Surat',              pincode:'395009', vehicle:'GJ05CL9102', priorExpYears:4 },
-      EMP004: { bloodGroup:'B+',  birthDate:'1990-05-30', address:'5, Shyam Villa, Piplod, Surat',                 pincode:'395007', vehicle:'GJ05DN4517', priorExpYears:2 },
-      EMP005: { bloodGroup:'O+',  birthDate:'1988-09-14', address:'Plot 7, Ramnagar Society, Udhna, Surat',        pincode:'394210', vehicle:'GJ05EP8823', priorExpYears:3 },
-      EMP006: { bloodGroup:'A+',  birthDate:'1993-02-19', address:'3, Shivam Flats, Pal, Surat',                   pincode:'395009', vehicle:'GJ05FR1245', priorExpYears:1 },
-      EMP007: { bloodGroup:'B-',  birthDate:'1992-06-25', address:'Flat 12, Laxmi Residency, Limbayat, Surat',    pincode:'395006', vehicle:'GJ05GS3370', priorExpYears:2 },
-      EMP008: { bloodGroup:'O+',  birthDate:'1995-12-03', address:'9, Anand Society, Althan, Surat',               pincode:'395017', vehicle:'',           priorExpYears:0 },
-      EMP009: { bloodGroup:'AB+', birthDate:'1987-04-10', address:'18, Shakti Nagar, Amroli, Surat',               pincode:'394107', vehicle:'GJ05HS5581', priorExpYears:4 },
-      EMP010: { bloodGroup:'A+',  birthDate:'1991-08-22', address:'27, Rajhans Residency, Bhestan, Surat',         pincode:'395023', vehicle:'GJ05JT6694', priorExpYears:3 },
-      EMP011: { bloodGroup:'B+',  birthDate:'1994-01-17', address:'6, Sai Krupa Society, Vesu, Surat',             pincode:'395007', vehicle:'',           priorExpYears:0 },
-      EMP012: { bloodGroup:'O-',  birthDate:'1989-10-05', address:'Plot 3, Shreenath Park, Sarthana, Surat',       pincode:'395006', vehicle:'GJ05KV7715', priorExpYears:4 },
-      EMP013: { bloodGroup:'A+',  birthDate:'1993-07-29', address:'11, Ganesh Nagar, Kosad, Surat',                pincode:'394107', vehicle:'GJ05LW8826', priorExpYears:2 },
-      EMP014: { bloodGroup:'A-',  birthDate:'1996-03-11', address:'Flat 4, Shivam Residency, Citylight, Surat',   pincode:'395007', vehicle:'',           priorExpYears:0 },
-      EMP015: { bloodGroup:'B+',  birthDate:'1990-11-27', address:'32, Shubh Laxmi Society, Ring Road, Surat',    pincode:'395002', vehicle:'GJ05MX9931', priorExpYears:3 },
-      EMP016: { bloodGroup:'O+',  birthDate:'1986-06-18', address:'8, Nav Durga Society, Pandesara, Surat',        pincode:'394221', vehicle:'GJ05NY1042', priorExpYears:6 },
-      EMP017: { bloodGroup:'AB+', birthDate:'1996-09-04', address:'21, Swaminarayan Park, Dumas Road, Surat',      pincode:'395007', vehicle:'',           priorExpYears:0 },
-      EMP018: { bloodGroup:'B-',  birthDate:'1988-02-14', address:'5, Vijay Nagar, Udhna, Surat',                  pincode:'394210', vehicle:'GJ05PZ2153', priorExpYears:3 },
-      EMP019: { bloodGroup:'A+',  birthDate:'1984-12-20', address:'17, Param Society, Jahangirpura, Surat',        pincode:'395005', vehicle:'GJ05QA3264', priorExpYears:6 }
-    };
-    const patched = existingEmps4.map(e => profilePatch[e.id] ? { ...e, ...profilePatch[e.id] } : e);
-    saveEmployees(patched);
-    return;
-  }
-
-  // v3: add 10 more employees, extended attendance, 50 labours, messages, groups
-  const existingEmps3 = getEmployees();
-  if (existingEmps3.length > 0 && !existingEmps3.find(e => e.id === 'EMP010')) {
-    const newEmps = [
-      { id:'EMP010', name:'Suresh Yadav',     role:'EN', designation:'Site Engineer',        department:'Civil',    mobile:'9876501010', username:'suresh.yadav',     avatar:'SY', joinDate:'2024-02-10', active:true, status:'active' },
-      { id:'EMP011', name:'Priya Nair',       role:'JE', designation:'Junior Engineer',      department:'Civil',    mobile:'9876501011', username:'priya.nair',       avatar:'PN', joinDate:'2024-03-01', active:true, status:'active' },
-      { id:'EMP012', name:'Amit Verma',       role:'SV', designation:'Supervisor / Foreman', department:'Site Ops', mobile:'9876501012', username:'amit.verma',       avatar:'AV', joinDate:'2023-11-15', active:true, status:'active' },
-      { id:'EMP013', name:'Rakesh Gupta',     role:'AS', designation:'Asst. Supervisor',     department:'Site Ops', mobile:'9876501013', username:'rakesh.gupta',     avatar:'RG', joinDate:'2024-01-20', active:true, status:'active' },
-      { id:'EMP014', name:'Sneha Patil',      role:'TK', designation:'Timekeeper',           department:'Admin',    mobile:'9876501014', username:'sneha.patil',      avatar:'SP', joinDate:'2024-04-05', active:true, status:'active' },
-      { id:'EMP015', name:'Vivek Kumar',      role:'EN', designation:'Site Engineer',        department:'Electrical',mobile:'9876501015',username:'vivek.kumar',      avatar:'VK', joinDate:'2023-12-01', active:true, status:'active' },
-      { id:'EMP016', name:'Dinesh Bhai',      role:'SV', designation:'Supervisor / Foreman', department:'Site Ops', mobile:'9876501016', username:'dinesh.bhai',      avatar:'DB', joinDate:'2024-05-10', active:true, status:'active' },
-      { id:'EMP017', name:'Kavita Sharma',    role:'JE', designation:'Junior Engineer',      department:'Civil',    mobile:'9876501017', username:'kavita.sharma',    avatar:'KS2',joinDate:'2025-01-15', active:true, status:'active' },
-      { id:'EMP018', name:'Mohan Lal',        role:'AS', designation:'Asst. Supervisor',     department:'Site Ops', mobile:'9876501018', username:'mohan.lal',        avatar:'ML', joinDate:'2025-02-01', active:false,status:'resigned', resignedDate:'2026-01-30' },
-      { id:'EMP019', name:'Tarun Mishra',     role:'SE', designation:'Senior Site Engineer', department:'Civil',    mobile:'9876501019', username:'tarun.mishra',     avatar:'TM', joinDate:'2023-07-01', active:true, status:'active' }
-    ];
-    const newUsers = [
-      { username:'suresh.yadav',   password:'pass123', employee_id:'EMP010', role:'EN' },
-      { username:'priya.nair',     password:'pass123', employee_id:'EMP011', role:'JE' },
-      { username:'amit.verma',     password:'pass123', employee_id:'EMP012', role:'SV' },
-      { username:'rakesh.gupta',   password:'pass123', employee_id:'EMP013', role:'AS' },
-      { username:'sneha.patil',    password:'pass123', employee_id:'EMP014', role:'TK' },
-      { username:'vivek.kumar',    password:'pass123', employee_id:'EMP015', role:'EN' },
-      { username:'dinesh.bhai',    password:'pass123', employee_id:'EMP016', role:'SV' },
-      { username:'kavita.sharma',  password:'pass123', employee_id:'EMP017', role:'JE' },
-      { username:'mohan.lal',      password:'pass123', employee_id:'EMP018', role:'AS' },
-      { username:'tarun.mishra',   password:'pass123', employee_id:'EMP019', role:'SE' }
-    ];
-    const allEmps = [...existingEmps3, ...newEmps];
-    const allUsers = getUsers();
-    newUsers.forEach(u => { if (!allUsers.find(x => x.username === u.username)) allUsers.push(u); });
-    saveEmployees(allEmps);
-    saveUsers(allUsers);
-
-    // Extended attendance: 30 days for all employees
-    const attSched30 = {
-      EMP001:{ times:['08:00','18:30'], absent:[3,9,15,22,27] },
-      EMP002:{ times:['08:15','18:00'], absent:[4,10,16,23] },
-      EMP003:{ times:['08:30','17:30'], absent:[2,7,14,21,28] },
-      EMP004:{ times:['08:30','17:30'], absent:[1,8,12,19,25] },
-      EMP005:{ times:['08:00','17:00'], absent:[5,11,17,24] },
-      EMP006:{ times:['08:30','17:00'], absent:[3,9,13,20,26] },
-      EMP007:{ times:['09:00','17:00'], absent:[0,6,12,18,27] },
-      EMP008:{ times:['09:00','16:30'], absent:[2,8,15,22] },
-      EMP009:{ times:['09:30','17:00'], absent:[1,6,11,18,25] },
-      EMP010:{ times:['08:30','17:30'], absent:[3,10,17,24] },
-      EMP011:{ times:['09:00','17:30'], absent:[2,9,16,23] },
-      EMP012:{ times:['08:00','17:00'], absent:[4,11,18,25] },
-      EMP013:{ times:['08:30','17:00'], absent:[0,7,14,21,28] },
-      EMP014:{ times:['09:00','16:30'], absent:[5,12,19,26] },
-      EMP015:{ times:['08:30','18:00'], absent:[1,8,15,22,29] },
-      EMP016:{ times:['07:45','17:00'], absent:[3,10,17,24] },
-      EMP017:{ times:['09:00','17:30'], absent:[2,9,16] },
-      EMP019:{ times:['08:00','18:00'], absent:[4,11,18,25] }
-    };
-    const existingAtt = getSupAtt();
-    const newAttIds = new Set(existingAtt.map(a => a.employeeId+'_'+a.date));
-    const newAtt = [];
-    Object.entries(attSched30).forEach(([empId, sched]) => {
-      for (let i=29; i>=0; i--) {
-        if (sched.absent.includes(29-i)) continue;
-        const d = dateOffset(i);
-        if (isFuture(d)) continue;
-        if (newAttIds.has(empId+'_'+d)) continue;
-        const [inH, outH] = sched.times;
-        const inMin  = Math.floor(Math.random()*10);
-        const outMin = Math.floor(Math.random()*10);
-        const inT  = inH.split(':')[0]+':'+String(+inH.split(':')[1]+inMin).padStart(2,'0');
-        const outT = outH.split(':')[0]+':'+String(+outH.split(':')[1]+outMin).padStart(2,'0');
-        newAtt.push({ id:empId+'_'+d, employeeId:empId, date:d, punches:[{inTime:inT,outTime:outT}] });
-      }
-    });
-    saveSupAtt([...existingAtt, ...newAtt]);
-
-    // 50 labour workers
-    const skills = ['Mason','Helper','Bar Bender','Carpenter','Plumber','Electrician','Painter','Welder','Excavator Op','Crane Op'];
-    const labourNames = [
-      'Ramesh Kumar','Santosh Bind','Mukesh Yadav','Ganesh Patel','Ashok Singh','Bhola Prasad','Rajkumar Das','Sunil Mahato',
-      'Dinesh Nishad','Raju Bind','Pappu Kumar','Bablu Paswan','Sonu Verma','Monu Shah','Chotu Sah','Lallan Patel',
-      'Umesh Yadav','Naresh Singh','Deepak Kumar','Arun Mishra','Vijay Bind','Pramod Nishad','Dilip Chauhan','Kamal Patel',
-      'Hemant Yadav','Vinod Kumar','Ajay Prasad','Sanjay Das','Manoj Singh','Ravi Sah','Shyam Patel','Kishan Bind',
-      'Netram Yadav','Laxman Kumar','Jitendra Singh','Prakash Nishad','Mahesh Sah','Gopal Das','Biswanath Yadav','Hare Ram Bind',
-      'Surendra Patel','Nirmal Kumar','Pawan Singh','Devendra Yadav','Santosh Chauhan','Babulal Mishra','Ramkumar Das','Govind Prasad',
-      'Shankar Bind','Mohan Nishad'
-    ];
-    const labourMobiles = Array.from({length:50}, (_,i) => '98765'+(20001+i));
-    const existingLabour = getLmsWorkers();
-    if (existingLabour.length < 10) {
-      const labours = labourNames.map((name, i) => ({
-        id: String(2000001 + i),
-        name,
-        skill: skills[i % skills.length],
-        mobile: labourMobiles[i],
-        isCompanion: i > 0 && i % 8 === 0
-      }));
-      saveLmsWorkers(labours);
-
-      // Labour attendance: last 20 days, ~40 workers per day
-      const lmsAtt = [];
-      const laborShifts = ['07:00','07:30','07:15','07:45','08:00'];
-      const laborOuts   = ['17:00','17:30','18:00','16:30','17:15'];
-      for (let d=19; d>=0; d--) {
-        const date = dateOffset(d);
-        const present = labours.filter((_,i) => (i + d) % 5 !== 0); // ~40/day
-        present.forEach((lab, idx) => {
-          const si = idx % laborShifts.length;
-          const inMin  = Math.floor(Math.random()*15);
-          const outMin = Math.floor(Math.random()*15);
-          const [ih, im] = laborShifts[si].split(':').map(Number);
-          const [oh, om] = laborOuts[si].split(':').map(Number);
-          const inT  = String(ih).padStart(2,'0')+':'+String(im+inMin).padStart(2,'0');
-          const outT = d === 0 ? null : String(oh).padStart(2,'0')+':'+String(om+outMin).padStart(2,'0');
-          lmsAtt.push({ workerId:lab.id, date, inTime:inT, outTime:outT });
-        });
-      }
-      saveLmsAtt(lmsAtt);
-    }
-
-    // Messages between employees (DMs)
-    const convos = [
-      { from:'EMP001', to:'EMP002', msgs:['Bhavesh, how is the progress on Zone 3?','Zone 3 formwork is 70% done. Should complete by tomorrow evening.','Great. Make sure the concrete pour is planned for day after.','Yes sir, I have already coordinated with Raghav Concrete.'] },
-      { from:'EMP002', to:'EMP003', msgs:['Chirag, any update on the foundation survey?','Sir, survey is done for Block A. Starting Block B tomorrow.','Good. Share the report with Shah & Associates today.','Will send by 5 PM sir.'] },
-      { from:'EMP003', to:'EMP004', msgs:['Dhaval, cube samples ready?','Yes, collected this morning. Will submit to lab by noon.','Good. Keep the receipt for records.','Done, receipt attached in site folder.'] },
-      { from:'EMP001', to:'EMP009', msgs:['Meena, please update the joining date for Tarun Mishra.','Sure sir, I will update it today.','Also confirm Kavita Sharma new employee registration is done.','Both done sir. EMP017 and EMP019 are registered.'] },
-      { from:'EMP005', to:'EMP007', msgs:['Nilesh, who is handling night shift tomorrow?','I will take first half, Rakesh will cover second.','Ok. Make sure gate log is maintained properly.','Yes sir, will ensure.'] },
-      { from:'EMP006', to:'EMP019', msgs:['Tarun bhai, can you review the RCC drawings for Phase 2?','Yes I will look at them by today evening.','Thank you, there are some doubts on the beam layout.','Come to my cabin at 4 PM, we will go through together.'] },
-      { from:'EMP008', to:'EMP014', msgs:['Sneha, timesheet for last week is still pending from your side.','Sorry, will submit in 30 minutes.','Please do it on priority, client audit is this Friday.','Done, submitted just now.'] },
-      { from:'EMP010', to:'EMP012', msgs:['Amit, can you spare 2 workers for trench digging in Zone 1?','Yes, send them by 9 AM tomorrow.','Ok, I will send Ramesh and Santosh.','Fine, they can report to me directly.'] }
-    ];
-    const existingMsgs = getMessages();
-    const msgsToAdd = [];
-    convos.forEach(({from, to, msgs}) => {
-      msgs.forEach((text, i) => {
-        const sender = i % 2 === 0 ? from : to;
-        const receiver = i % 2 === 0 ? to : from;
-        const hoursAgo = (convos.length * msgs.length) - (msgsToAdd.length + i);
-        const ts = new Date(Date.now() - hoursAgo * 3600000 - Math.random()*1800000).toISOString();
-        msgsToAdd.push({ id:'MSG'+String(Date.now()+msgsToAdd.length+i).slice(-8), from:sender, to:receiver, text, timestamp:ts, read:true });
-      });
-    });
-    saveMessages([...existingMsgs, ...msgsToAdd]);
-
-    // Groups with messages
-    const existingGroups = getGroups();
-    if (!existingGroups.find(g => g.name === 'Site Management')) {
-      const groups = [
-        { id:'GRP001', name:'Site Management', members:['EMP001','EMP002','EMP003','EMP019','EMP009'], createdBy:'EMP001', createdAt:dateOffset(25)+'T09:00:00' },
-        { id:'GRP002', name:'Civil Team',       members:['EMP003','EMP004','EMP006','EMP010','EMP011','EMP017','EMP019'], createdBy:'EMP003', createdAt:dateOffset(20)+'T10:00:00' },
-        { id:'GRP003', name:'Site Ops',          members:['EMP005','EMP007','EMP012','EMP013','EMP016'], createdBy:'EMP005', createdAt:dateOffset(15)+'T08:00:00' },
-        { id:'GRP004', name:'Admin & HR',        members:['EMP001','EMP008','EMP009','EMP014'], createdBy:'EMP009', createdAt:dateOffset(10)+'T09:30:00' }
-      ];
-      const groupMsgs = [
-        { gid:'GRP001', from:'EMP001', text:'Good morning team. Weekly review is scheduled for Saturday 10 AM.' },
-        { gid:'GRP001', from:'EMP002', text:'Noted sir. I will prepare the zone-wise progress update.' },
-        { gid:'GRP001', from:'EMP003', text:'Block A survey report will be ready by Friday.' },
-        { gid:'GRP001', from:'EMP019', text:'I will bring the Phase 2 drawing comments as well.' },
-        { gid:'GRP001', from:'EMP009', text:'Attendance and HR documents will be ready sir.' },
-        { gid:'GRP002', from:'EMP003', text:'Team, cube testing results are in. Mix design approved by lab.' },
-        { gid:'GRP002', from:'EMP004', text:'Great news! So we can proceed with pour in Zone 3?' },
-        { gid:'GRP002', from:'EMP019', text:'Yes, beam layout is also confirmed. Let us plan for Thursday.' },
-        { gid:'GRP002', from:'EMP006', text:'I will coordinate with the RMC supplier for Thursday delivery.' },
-        { gid:'GRP002', from:'EMP010', text:'I will ensure shuttering is done by Wednesday evening.' },
-        { gid:'GRP002', from:'EMP011', text:'Bar bending for Zone 3 beams is 80% complete.' },
-        { gid:'GRP003', from:'EMP005', text:'All supervisors please ensure labour attendance is marked by 8:15 AM sharp.' },
-        { gid:'GRP003', from:'EMP012', text:'Understood. Will follow up with my team.' },
-        { gid:'GRP003', from:'EMP007', text:'Night shift handover went smooth last night. All clear.' },
-        { gid:'GRP003', from:'EMP013', text:'Zone 1 trench digging is on schedule.' },
-        { gid:'GRP003', from:'EMP016', text:'Scaffolding on Block B is complete. Ready for next stage.' },
-        { gid:'GRP004', from:'EMP009', text:'Reminder: All salary documents to be submitted by 25th.' },
-        { gid:'GRP004', from:'EMP008', text:'Timesheets for the month are compiled. Will share by EOD.' },
-        { gid:'GRP004', from:'EMP014', text:'New joinee documents for EMP017 are ready for HR records.' },
-        { gid:'GRP004', from:'EMP001', text:'Good work team. Keep the documentation up to date.' }
-      ];
-      saveGroups([...existingGroups, ...groups]);
-      const allMsgs = getMessages();
-      groupMsgs.forEach((m, i) => {
-        const hoursAgo = groupMsgs.length - i;
-        const ts = new Date(Date.now() - hoursAgo * 3600000 - Math.random()*900000).toISOString();
-        allMsgs.push({ id:'GMSG'+String(Date.now()+i).slice(-8), from:m.from, groupId:m.gid, text:m.text, timestamp:ts });
-      });
-      saveMessages(allMsgs);
-    }
-    return;
-  }
-
-  // v2: re-seed if HR employee (EMP009) doesn't exist yet
-  const existingEmps = getEmployees();
-  if (existingEmps.length > 0 && !existingEmps.find(e => e.id === 'EMP009')) {
-    // Migration: add HR employee + user to existing data
-    const emps  = existingEmps;
-    const users = getUsers();
-    emps.push({ id:'EMP009', name:'Meena Joshi', role:'HR', designation:'HR Manager', department:'Admin', mobile:'9876501009', username:'meena.joshi', avatar:'MJ', joinDate:'2023-09-01', active:true, status:'active', hrRoleEditApproved:false });
-    saveEmployees(emps);
-    if (!users.find(u => u.username === 'meena.joshi')) {
-      users.push({ username:'meena.joshi', password:'pass123', employee_id:'EMP009', role:'HR' });
-      saveUsers(users);
-    }
-    // Also ensure existing employees have status field
-    emps.forEach(e => { if (!e.status) e.status = e.active ? 'active' : 'resigned'; });
-    saveEmployees(emps);
-    return;
-  }
-  if (DB.seeded) return;
-
-  const employees = [
-    { id:'EMP001', name:'Rajesh Patel',    role:'PM', designation:'Project Manager',      department:'Management', mobile:'9876501001', username:'rajesh.patel',    avatar:'RP', joinDate:'2022-04-01', active:true, status:'active' },
-    { id:'EMP002', name:'Bhavesh Desai',   role:'SM', designation:'Site Manager',          department:'Management', mobile:'9876501002', username:'bhavesh.desai',   avatar:'BD', joinDate:'2022-06-15', active:true, status:'active' },
-    { id:'EMP003', name:'Chirag Mehta',    role:'SE', designation:'Senior Site Engineer',  department:'Civil',      mobile:'9876501003', username:'chirag.mehta',    avatar:'CM', joinDate:'2023-01-10', active:true, status:'active' },
-    { id:'EMP004', name:'Dhaval Shah',     role:'EN', designation:'Site Engineer',         department:'Civil',      mobile:'9876501004', username:'dhaval.shah',     avatar:'DS', joinDate:'2023-03-20', active:true, status:'active' },
-    { id:'EMP005', name:'Hitesh Chauhan',  role:'SV', designation:'Supervisor / Foreman',  department:'Site Ops',   mobile:'9876501005', username:'hitesh.chauhan',  avatar:'HC', joinDate:'2023-05-01', active:true, status:'active' },
-    { id:'EMP006', name:'Kalpesh Solanki', role:'JE', designation:'Junior Engineer',       department:'Civil',      mobile:'9876501006', username:'kalpesh.solanki', avatar:'KS', joinDate:'2023-08-15', active:true, status:'active' },
-    { id:'EMP007', name:'Nilesh Rathod',   role:'AS', designation:'Asst. Supervisor',      department:'Site Ops',   mobile:'9876501007', username:'nilesh.rathod',   avatar:'NR', joinDate:'2023-10-01', active:true, status:'active' },
-    { id:'EMP008', name:'Paresh Trivedi',  role:'TK', designation:'Timekeeper',            department:'Admin',      mobile:'9876501008', username:'paresh.trivedi',  avatar:'PT', joinDate:'2024-01-05', active:true, status:'active' },
-    { id:'EMP009', name:'Meena Joshi',     role:'HR', designation:'HR Manager',             department:'Admin',      mobile:'9876501009', username:'meena.joshi',     avatar:'MJ', joinDate:'2023-09-01', active:true, status:'active', hrRoleEditApproved:false }
-  ];
-
-  const users = [
-    { username:'rajesh.patel',    password:'admin123', employee_id:'EMP001', role:'PM' },
-    { username:'bhavesh.desai',   password:'pass123',  employee_id:'EMP002', role:'SM' },
-    { username:'chirag.mehta',    password:'pass123',  employee_id:'EMP003', role:'SE' },
-    { username:'dhaval.shah',     password:'pass123',  employee_id:'EMP004', role:'EN' },
-    { username:'hitesh.chauhan',  password:'pass123',  employee_id:'EMP005', role:'SV' },
-    { username:'kalpesh.solanki', password:'pass123',  employee_id:'EMP006', role:'JE' },
-    { username:'nilesh.rathod',   password:'pass123',  employee_id:'EMP007', role:'AS' },
-    { username:'paresh.trivedi',  password:'pass123',  employee_id:'EMP008', role:'TK' },
-    { username:'meena.joshi',     password:'pass123',  employee_id:'EMP009', role:'HR' }
-  ];
-
-  // Self-attendance: 14 days, each emp has 2-3 absences
-  const attSched = {
-    EMP001: { times:['08:00','18:30'], absent:[3,9] },
-    EMP002: { times:['08:15','18:00'], absent:[4,10] },
-    EMP003: { times:['08:30','17:30'], absent:[2,7] },
-    EMP004: { times:['08:30','17:30'], absent:[1,8,12] },
-    EMP005: { times:['08:00','17:00'], absent:[5,11] },
-    EMP006: { times:['08:30','17:00'], absent:[3,9,13] },
-    EMP007: { times:['09:00','17:00'], absent:[0,6] },
-    EMP008: { times:['09:00','16:30'], absent:[2,8] },
-    EMP009: { times:['09:30','17:00'], absent:[1,6,11] }
-  };
-
-  const attendance = [];
-  Object.entries(attSched).forEach(([empId, sched]) => {
-    for (let i=13; i>=0; i--) {
-      if (sched.absent.includes(13-i)) continue;
-      const d = dateOffset(i);
-      if (isFuture(d)) continue;
-      const [inH, outH] = sched.times;
-      const inMin  = Math.floor(Math.random()*10);
-      const outMin = Math.floor(Math.random()*10);
-      const inT    = inH.split(':')[0]+':'+String(+inH.split(':')[1]+inMin).padStart(2,'0');
-      const outT   = i===0 && empId==='EMP003' ? null : outH.split(':')[0]+':'+String(+outH.split(':')[1]+outMin).padStart(2,'0');
-      attendance.push({ id:empId+'_'+d, employeeId:empId, date:d, punches:[{inTime:inT,outTime:outT}] });
-    }
-  });
-
-  // Future availability: next 14 days
-  const availSeed = [
-    { empId:'EMP001', plans:{ 1:'on-site',2:'on-site',7:'leave',8:'leave',14:'field' }},
-    { empId:'EMP002', plans:{ 1:'on-site',3:'field',6:'wfh',10:'on-site' }},
-    { empId:'EMP003', plans:{ 1:'on-site',2:'on-site',4:'on-site',9:'leave' }},
-    { empId:'EMP004', plans:{ 1:'on-site',5:'wfh',11:'leave' }},
-    { empId:'EMP005', plans:{ 1:'on-site',3:'on-site',6:'leave',12:'on-site' }},
-    { empId:'EMP006', plans:{ 2:'on-site',5:'on-site',8:'leave' }},
-    { empId:'EMP007', plans:{ 1:'on-site',4:'field',9:'on-site' }},
-    { empId:'EMP008', plans:{ 2:'on-site',6:'holiday',13:'on-site' }}
-  ];
-
-  const availability = [];
-  availSeed.forEach(({empId, plans}) => {
-    Object.entries(plans).forEach(([offset, status]) => {
-      const d = dateFuture(+offset);
-      availability.push({ id:empId+'_'+d, employeeId:empId, date:d, status });
-    });
-  });
-
-  const tasks = [
-    { id:'TASK001', title:'Complete foundation survey — Block A',      description:'Detailed topographic and soil survey for Block A foundation work.', priority:'high',   status:'in-progress', assignedTo:'EMP003', createdBy:'EMP001', createdAt:dateOffset(5)+'T09:00:00', dueDate:dateFuture(3),  completedAt:null },
-    { id:'TASK002', title:'Submit weekly labour report to client',     description:'Weekly progress report including labour count and progress.',         priority:'medium', status:'open',        assignedTo:'EMP002', createdBy:'EMP001', createdAt:dateOffset(3)+'T10:00:00', dueDate:dateFuture(2),  completedAt:null },
-    { id:'TASK003', title:'Inspection of formwork — Zone 3',           description:'Check formwork alignment before concrete pour.',                     priority:'high',   status:'completed',   assignedTo:'EMP004', createdBy:'EMP003', createdAt:dateOffset(8)+'T08:30:00', dueDate:dateOffset(2),  completedAt:dateOffset(2)+'T16:00:00' },
-    { id:'TASK004', title:'Coordinate water tanker schedule',          description:'Ensure water availability for curing of Zone 2 slabs.',              priority:'low',    status:'open',        assignedTo:'EMP005', createdBy:'EMP002', createdAt:dateOffset(4)+'T11:00:00', dueDate:dateFuture(5),  completedAt:null },
-    { id:'TASK005', title:'Review RCC drawings — Phase 2',             description:'Review and approve structural drawings from consultant.',             priority:'medium', status:'in-progress', assignedTo:'EMP003', createdBy:'EMP001', createdAt:dateOffset(6)+'T09:00:00', dueDate:dateFuture(4),  completedAt:null },
-    { id:'TASK006', title:'Update timesheet entries for this month',   description:'Ensure all daily timesheets are updated and submitted.',              priority:'medium', status:'open',        assignedTo:'EMP008', createdBy:'EMP002', createdAt:dateOffset(2)+'T14:00:00', dueDate:dateFuture(1),  completedAt:null },
-    { id:'TASK007', title:'Safety briefing for new labourers',         description:'Conduct mandatory safety induction for 5 new workers.',              priority:'high',   status:'open',        assignedTo:'EMP005', createdBy:'EMP002', createdAt:dateOffset(1)+'T08:00:00', dueDate:today(),         completedAt:null },
-    { id:'TASK008', title:'Concrete cube testing — lab submission',    description:'Collect and submit concrete cube samples to testing lab.',            priority:'medium', status:'on-hold',     assignedTo:'EMP004', createdBy:'EMP003', createdAt:dateOffset(7)+'T10:00:00', dueDate:dateFuture(2),  completedAt:null },
-    { id:'TASK009', title:'Prepare site progress report — March',      description:'Monthly progress report with photos and quantity details.',          priority:'high',   status:'in-progress', assignedTo:'EMP006', createdBy:'EMP003', createdAt:dateOffset(3)+'T09:00:00', dueDate:dateFuture(6),  completedAt:null },
-    { id:'TASK010', title:'Equipment maintenance check — concrete mixer',description:'Monthly PM check on all concrete mixers and vibrators.',           priority:'low',    status:'completed',   assignedTo:'EMP007', createdBy:'EMP005', createdAt:dateOffset(9)+'T08:00:00', dueDate:dateOffset(3),  completedAt:dateOffset(3)+'T15:30:00' }
-  ];
-
-  const notes = [
-    { id:'NOTE001', aboutEmployeeId:'EMP003', byEmployeeId:'EMP001', text:'Foundation survey completed ahead of schedule. Excellent coordination with the consultant team.', category:'performance', createdAt:dateOffset(5)+'T17:00:00' },
-    { id:'NOTE002', aboutEmployeeId:'EMP004', byEmployeeId:'EMP003', text:'Concrete cube submission missed once this month. Reminded and corrected. Should be monitored.', category:'incident',    createdAt:dateOffset(3)+'T16:30:00' },
-    { id:'NOTE003', aboutEmployeeId:'EMP005', byEmployeeId:'EMP002', text:'Reliable supervisor. Labour management is strong. Workers respect him on site.', category:'performance', createdAt:dateOffset(7)+'T18:00:00' },
-    { id:'NOTE004', aboutEmployeeId:'EMP006', byEmployeeId:'EMP003', text:'Good learning attitude. Needs to build confidence in client-facing communication.', category:'general',     createdAt:dateOffset(4)+'T17:30:00' },
-    { id:'NOTE005', aboutEmployeeId:'EMP008', byEmployeeId:'EMP002', text:'Timesheets submitted late twice this month. Verbal reminder given on 2nd instance.', category:'incident',    createdAt:dateOffset(2)+'T10:00:00' },
-    { id:'NOTE006', aboutEmployeeId:'EMP007', byEmployeeId:'EMP005', text:'Assisted well during overtime shift for formwork. Positive attitude.',                 category:'general',     createdAt:dateOffset(6)+'T19:00:00' }
-  ];
-
-  const contacts = [
-    { id:'CON001', name:'Fire Station — Surat South',       category:'emergency', phone:'02612413000', description:'Nearest fire station to project site',            addedBy:'EMP001', addedAt:dateOffset(30)+'T10:00:00' },
-    { id:'CON002', name:'Ambulance / SMIMER Hospital',       category:'emergency', phone:'108',         description:'Emergency ambulance & nearest govt hospital',     addedBy:'EMP001', addedAt:dateOffset(30)+'T10:00:00' },
-    { id:'CON003', name:'Police Control Room',               category:'emergency', phone:'100',         description:'Surat city police control',                       addedBy:'EMP001', addedAt:dateOffset(30)+'T10:00:00' },
-    { id:'CON004', name:'Raghav Concrete & Aggregates',      category:'vendor',    phone:'9824501234', description:'RMC supplier — ready-mix concrete deliveries',     addedBy:'EMP002', addedAt:dateOffset(20)+'T09:00:00' },
-    { id:'CON005', name:'Mehta Steel Traders',               category:'vendor',    phone:'9824509876', description:'TMT bars and structural steel supplier',           addedBy:'EMP002', addedAt:dateOffset(20)+'T09:00:00' },
-    { id:'CON006', name:'Surat Municipal Corporation (SMC)', category:'client',    phone:'02612420501', description:'Client PMC contact — road project nodal officer', addedBy:'EMP001', addedAt:dateOffset(25)+'T11:00:00' },
-    { id:'CON007', name:'Shah & Associates (Consultant)',    category:'client',    phone:'9898201234', description:'Structural consultant — drawing approvals',        addedBy:'EMP001', addedAt:dateOffset(25)+'T11:00:00' },
-    { id:'CON008', name:'Jay Electricals (Subcontractor)',   category:'agency',    phone:'9726501111', description:'Electrical & street lighting subcontractor',       addedBy:'EMP003', addedAt:dateOffset(15)+'T10:00:00' },
-    { id:'CON009', name:'Patel Infrastructure Head Office',  category:'office',    phone:'02612500100', description:'Ahmedabad HO — HR and accounts contact',          addedBy:'EMP001', addedAt:dateOffset(30)+'T10:00:00' },
-    { id:'CON010', name:'Site Security Guard (Night)',       category:'other',     phone:'9099801234', description:'Night shift security — call for site access after hours', addedBy:'EMP002', addedAt:dateOffset(10)+'T08:00:00' }
-  ];
-
-  await saveEmployees(employees);
-  await saveUsers(users);
-  await saveSupAtt(attendance);
-  await saveAvailList(availability);
-  await saveTasks(tasks);
-  await saveNotes(notes);
-  await saveContacts(contacts);
-  DB.seeded = true;
-  await supabaseClient.from('meta').upsert([{ key: 'config', seeded: true }], { onConflict: 'key' });
-}
 
 // ══════════════════════════════════════════════════════════
 // INIT
