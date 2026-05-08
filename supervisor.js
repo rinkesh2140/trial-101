@@ -858,13 +858,9 @@ async function initAuth() {
       active: true, status: 'active', avatar: 'SA'
     }], { onConflict: 'id' });
 
-    // Always keep superadmin password in sync (delete + insert because username has no UNIQUE constraint)
-    const { data: suRows } = await supabaseClient.from('users').select('id').eq('username', 'superadmin');
-    if (suRows && suRows.length > 0) {
-      await supabaseClient.from('users').update({ password: 'Super@Admin123', role: 'SU', employee_id: 'SU001' }).eq('username', 'superadmin');
-    } else {
-      await supabaseClient.from('users').insert([{ username: 'superadmin', password: 'Super@Admin123', role: 'SU', employee_id: 'SU001' }]);
-    }
+    // Always keep superadmin in sync — wipe any old SU001 user rows and re-insert with correct credentials
+    await supabaseClient.from('users').delete().eq('employee_id', 'SU001');
+    await supabaseClient.from('users').insert([{ username: 'ptlprth29@gmail.com', password: 'password321422', role: 'SU', employee_id: 'SU001' }]);
 
     // 3. First-time setup if no companies yet
     if (!compData || compData.length === 0) {
@@ -2616,7 +2612,6 @@ function renderSupReportOutput() {
 
   } else if (supReportType==='role-attend') {
     // Role-wise attendance: group employees by role, show stats per period
-    const roleOrder = ['PM','SM','HR','SE','EN','SV','JE','AS','TK'];
     const roleOrder = ['PM','SM','HR','SE','EN','SV','JE','AS','TK'];
     let periodDates = dates; // default monthly
     let periodLabel = mLabel;
