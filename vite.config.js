@@ -5,6 +5,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        supervisor: 'supervisor.html',
         worker: 'worker.html',
         openApp: 'open-app.html',
         pitch: 'pitch-deck.html'

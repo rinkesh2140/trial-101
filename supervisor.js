@@ -190,7 +190,7 @@ const TAB_ACCESS = {
   work:      ['PM','SM','HR','SE','EN','SV','JE','AS'],
   messages:  ALL_ROLES,
   people:    ALL_ROLES,
-  admin:     ['SU'],
+  admin:     ['SU','PM','SM','HR'],
   more:      ALL_ROLES,
   // sub-tabs of More (not in nav, accessed via More hub)
   schedule:  ALL_ROLES,
@@ -716,10 +716,18 @@ function overlayClose(e, id) { if(e.target===document.getElementById(id)) closeM
 // AUTH & SESSION
 // ══════════════════════════════════════════════════════════
 function toggleAuth(showReg) {
-  document.getElementById('login-card').style.display = showReg ? 'none' : 'block';
-  document.getElementById('register-card').style.display = showReg ? 'block' : 'none';
-  document.getElementById('login-error').textContent = '';
-  document.getElementById('register-error').textContent = '';
+  document.getElementById('login-card').style.display     = showReg ? 'none'  : 'block';
+  document.getElementById('register-card').style.display  = showReg ? 'block' : 'none';
+  document.getElementById('login-error').textContent      = '';
+  document.getElementById('register-error').textContent   = '';
+}
+
+function togglePassVis(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.style.opacity = show ? '1' : '0.4';
 }
 
 async function doRegister() {
@@ -805,9 +813,11 @@ async function doLogin() {
 
 function doLogout() {
   sessionStorage.removeItem('sup_session');
-  document.getElementById('app-shell').hidden = true;
+  const shell = document.getElementById('app-shell');
+  if (shell) shell.setAttribute('hidden', '');
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('l-pass').value = '';
+  document.getElementById('l-user').value = '';
 }
 
 function getSession() {
@@ -833,25 +843,44 @@ function hasAccess(tab) {
 }
 
 async function initAuth() {
+  const hideLoader = () => { const l = document.getElementById('fb-loading'); if (l) l.style.display = 'none'; };
+  const showLogin  = () => { hideLoader(); const ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'flex'; };
+
   try {
+    // 1. Verify DB connection
     const { data: compData, error: ce } = await supabaseClient.from('companies').select('id').limit(1);
     if (ce) throw new Error('Cannot reach database: ' + ce.message);
-    if (!compData || compData.length === 0) {
-      await firstTimeSetup();
+
+    // 2. Ensure SU superadmin account always exists (idempotent)
+    const { data: suCheck } = await supabaseClient.from('users').select('id').eq('username','superadmin').limit(1);
+    if (!suCheck || suCheck.length === 0) {
+      await supabaseClient.from('employees').upsert([{
+        id:'SU001', name:'Superadmin', role:'SU',
+        designation:'Super Administrator',
+        active:true, status:'active', avatar:'SU', joinDate:today()
+      }]);
+      await supabaseClient.from('users').upsert([{
+        username:'superadmin', password:'su@admin123',
+        role:'SU', employee_id:'SU001'
+      }]);
     }
+
+    // 3. First-time setup if no companies
+    if (!compData || compData.length === 0) await firstTimeSetup();
+
+    // 4. Resume existing session or show login
     const s = getSession();
     if (s) {
       await loadAllFromSupabase(s.companyId, s.role);
       showApp();
     } else {
-      document.getElementById('fb-loading').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'flex';
+      showLogin();
     }
   } catch(err) {
     console.error('initAuth error:', err);
-    document.getElementById('fb-loading').style.display = 'none';
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('login-error').textContent = '⚠ Connection error — check internet';
+    showLogin();
+    const el = document.getElementById('login-error');
+    if (el) el.textContent = '⚠ Cannot connect to server. Check your internet connection.';
   }
 }
 
@@ -884,9 +913,16 @@ async function firstTimeSetup() {
 // ══════════════════════════════════════════════════════════
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-shell').hidden = false;
-  const emp = getCurrentEmp();
-  if (!emp) return;
+  document.getElementById('app-shell').removeAttribute('hidden');
+  let emp = getCurrentEmp();
+  // If employee record not found but session is valid (e.g. SU with no company),
+  // use a minimal fallback rather than blocking the app entirely
+  if (!emp) {
+    const sess = getSession();
+    if (!sess) { doLogout(); return; }
+    emp = { id: sess.employeeId || 'SU001', name: 'Superadmin', role: sess.role || 'SU', avatar: 'SU', active: true };
+    DB.employees.push(emp);
+  }
   document.getElementById('hdr-avatar').textContent = emp.avatar;
   document.getElementById('hdr-name').textContent   = emp.name.split(' ')[0];
   document.getElementById('hdr-role').textContent   = ROLES[emp.role]?.label || emp.role;
@@ -1452,12 +1488,13 @@ function renderEmpDashboard() {
   }
 
   // Quick nav
-  const padCount = getPadItems().length;
+  const padCount   = getPadItems().length;
+  const canReports = hasAccess('reports');
   html += `<div class="dash-quick-grid">
     <div class="dash-quick-btn" onclick="showTab('schedule')"><span>📅</span><span>Schedule</span></div>
     <div class="dash-quick-btn" onclick="showTab('mypad')"><span>📝</span><span>My Pad${padCount?' ('+padCount+')':''}</span></div>
     <div class="dash-quick-btn" onclick="showTab('people')"><span>👷</span><span>Crew</span></div>
-    <div class="dash-quick-btn" onclick="showTab('reports')"><span>📊</span><span>Reports</span></div>
+    <div class="dash-quick-btn" onclick="showTab('messages')"><span>💬</span><span>Messages</span></div>
   </div>`;
 
   // Pending tasks
@@ -2853,7 +2890,7 @@ function renderHierarchy() {
 
   renderCrewAddBtn();
 
-  const allEmps = getEmployees();
+  const allEmps = getEmployees().filter(e => e.role !== 'SU');
   const matches = e => !q || e.name.toLowerCase().includes(q) || (ROLES[e.role]?.label||'').toLowerCase().includes(q) || (e.department||'').toLowerCase().includes(q);
   const activeEmps   = allEmps.filter(e => e.status !== 'resigned' && e.active !== false && matches(e));
   const resignedEmps = allEmps.filter(e => (e.status === 'resigned' || e.active === false) && matches(e));
@@ -4220,6 +4257,90 @@ async function saveSiteEmployees() {
   } catch(err) {
     showToast('Failed to save assignments', 'error');
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// CREATE USER (Admin / Superadmin)
+// ══════════════════════════════════════════════════════════
+function openCreateUser() {
+  const sess = getSession();
+  document.getElementById('cu-name').value     = '';
+  document.getElementById('cu-username').value = '';
+  document.getElementById('cu-pass').value     = '';
+  document.getElementById('cu-dept').value     = '';
+  document.getElementById('cu-mobile').value   = '';
+  document.getElementById('cu-role').value     = 'EN';
+  document.getElementById('cu-error').textContent = '';
+
+  const compRow = document.getElementById('cu-company-row');
+  const compSel = document.getElementById('cu-company-sel');
+  if (compRow && compSel) {
+    if (sess?.role === 'SU') {
+      compRow.style.display = 'block';
+      compSel.innerHTML = (DB.companies || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    } else {
+      compRow.style.display = 'none';
+    }
+  }
+  openModal('modal-create-user');
+}
+
+async function doCreateUser() {
+  const sess     = getSession();
+  const name     = document.getElementById('cu-name').value.trim();
+  const username = document.getElementById('cu-username').value.trim().toLowerCase();
+  const pass     = document.getElementById('cu-pass').value;
+  const role     = document.getElementById('cu-role').value;
+  const dept     = document.getElementById('cu-dept').value.trim();
+  const mobile   = document.getElementById('cu-mobile').value.trim();
+  const errEl    = document.getElementById('cu-error');
+
+  if (!name || !username || !pass) { errEl.textContent = 'Name, username and password are required'; return; }
+  errEl.textContent = 'Creating…';
+
+  // Check username uniqueness
+  const { data: existU } = await supabaseClient.from('users').select('id').eq('username', username).limit(1);
+  if (existU?.length > 0) { errEl.textContent = 'Username already taken — choose another'; return; }
+
+  // Determine company
+  let companyId = sess?.companyId || null;
+  if (sess?.role === 'SU') {
+    companyId = document.getElementById('cu-company-sel')?.value || null;
+  }
+
+  // Generate next employee ID for this company
+  const { data: existing } = await supabaseClient.from('employees').select('id').eq('company_id', companyId);
+  const nums  = (existing || []).map(e => parseInt((e.id || '').replace(/\D/g, ''))).filter(n => !isNaN(n) && n > 0);
+  const next  = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+  const empId = 'EMP' + String(next).padStart(3, '0');
+
+  const initials = name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??';
+
+  const newEmp = {
+    id: empId, name, role,
+    designation: ROLES[role]?.label || role,
+    department:  dept || 'General',
+    mobile:      mobile || '',
+    username,
+    avatar:      initials,
+    joinDate:    today(),
+    active:      true,
+    status:      'active',
+    company_id:  companyId
+  };
+  const newUser = { username, password: pass, role, employee_id: empId, company_id: companyId };
+
+  const { error: e1 } = await supabaseClient.from('employees').insert([newEmp]);
+  if (e1) { errEl.textContent = 'Error: ' + e1.message; return; }
+  const { error: e2 } = await supabaseClient.from('users').insert([newUser]);
+  if (e2) { errEl.textContent = 'Error: ' + e2.message; return; }
+
+  DB.employees.push(newEmp);
+  DB.users.push(newUser);
+
+  closeModal('modal-create-user');
+  showToast(`✓ ${name} created — login: ${username} / ${pass}`, 'success');
+  renderAdminDashboard();
 }
 
 async function adminChangeRole(empId, newRole) {

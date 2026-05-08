@@ -26,39 +26,54 @@
 </div>
 
 <!-- ══════════ LOGIN ══════════ -->
-<div id="login-screen">
-  <div class="login-logo">🏗️</div>
-  <div class="login-title">Patel Infrastructure Pvt. Ltd.</div>
-  <div class="login-sub">Supervisor & Staff Portal</div>
+<div id="login-screen" style="display:none">
+  <div class="login-brand">
+    <div class="login-logo">🏗️</div>
+    <div class="login-title">Patel Infrastructure</div>
+    <div class="login-sub">Site Management Portal</div>
+  </div>
+
   <div id="login-card">
-    <h3>Sign In</h3>
-    <label for="l-user">Email / Username</label>
-    <input type="text" id="l-user" placeholder="Enter email" autocomplete="off">
+    <h3>Welcome back</h3>
+    <label for="l-user">Username</label>
+    <input type="text" id="l-user" placeholder="e.g. rajesh.patel" autocomplete="username" autocapitalize="none">
     <label for="l-pass">Password</label>
-    <input type="password" id="l-pass" placeholder="Enter password"
-           onkeydown="if(event.key==='Enter') doLogin()">
-    <button class="btn btn-primary" onclick="doLogin()">Login →</button>
-    <div style="text-align:center;margin-top:16px;">
-      <a href="#" onclick="toggleAuth(true)" style="color:var(--brand);font-size:13px;font-weight:700;text-decoration:none">New here? Register Account</a>
+    <div class="pass-wrap">
+      <input type="password" id="l-pass" placeholder="Enter password" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') doLogin()">
+      <button type="button" class="pass-eye" onclick="togglePassVis('l-pass',this)" tabindex="-1">👁</button>
     </div>
-    <div id="login-error"></div>
+    <button class="btn btn-primary login-btn" onclick="doLogin()">Sign In</button>
+    <div id="login-error" class="form-error"></div>
+    <div class="login-divider"><span>or</span></div>
+    <button class="btn btn-ghost" onclick="toggleAuth(true)" style="width:100%">Create Account</button>
   </div>
 
   <div id="register-card" style="display:none">
-    <h3>Employee Registration</h3>
+    <h3>Create Account</h3>
     <label for="r-name">Full Name</label>
-    <input type="text" id="r-name" placeholder="Enter full name" autocomplete="off">
+    <input type="text" id="r-name" placeholder="Your full name" autocomplete="name">
     <label for="r-email">Email Address</label>
-    <input type="email" id="r-email" placeholder="Enter your email" autocomplete="off">
+    <input type="email" id="r-email" placeholder="your@email.com" autocomplete="email">
     <label for="r-pass">Password</label>
-    <input type="password" id="r-pass" placeholder="Create password" autocomplete="off">
-    <button class="btn btn-accent" onclick="doRegister()">Register Now →</button>
-    <div style="text-align:center;margin-top:16px;">
-      <a href="#" onclick="toggleAuth(false)" style="color:var(--text-3);font-size:13px;font-weight:700;text-decoration:none">Already have an account? Login</a>
-    </div>
-    <div id="register-error" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center"></div>
+    <input type="password" id="r-pass" placeholder="Create a password" autocomplete="new-password">
+    <button class="btn btn-primary login-btn" onclick="doRegister()">Create Account</button>
+    <div id="register-error" class="form-error"></div>
+    <button class="btn btn-ghost" onclick="toggleAuth(false)" style="width:100%;margin-top:8px">Back to Sign In</button>
   </div>
-  <div class="login-footer">Surat Smart City Road Project</div>
+
+  <div class="login-demo">
+    <details>
+      <summary>Demo Credentials</summary>
+      <div class="demo-creds">
+        <div><strong>Superadmin:</strong> superadmin / su@admin123</div>
+        <div><strong>PM:</strong> rajesh.patel / admin123</div>
+        <div><strong>SM:</strong> bhavesh.desai / pass123</div>
+        <div><strong>HR:</strong> meena.joshi / pass123</div>
+        <div><strong>SE:</strong> chirag.mehta / pass123</div>
+      </div>
+    </details>
+  </div>
 </div>
 
 <!-- ══════════ APP SHELL ══════════ -->
@@ -546,6 +561,44 @@
       </div>
     </div>
     <button class="btn btn-primary" onclick="saveSiteEmployees()">Save Assignments</button>
+  </div>
+</div>
+
+<!-- ── CREATE USER ── -->
+<div id="modal-create-user" class="modal-overlay" onclick="overlayClose(event,'modal-create-user')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">➕ Create User Account</span>
+      <button class="modal-close" onclick="closeModal('modal-create-user')">✕</button>
+    </div>
+    <div id="cu-company-row" style="display:none">
+      <label>Company</label>
+      <select id="cu-company-sel"></select>
+    </div>
+    <label>Full Name *</label>
+    <input type="text" id="cu-name" placeholder="Employee full name">
+    <label>Role *</label>
+    <select id="cu-role">
+      <option value="PM">Project Manager</option>
+      <option value="SM">Site Manager</option>
+      <option value="HR">HR Manager</option>
+      <option value="SE">Senior Site Engineer</option>
+      <option value="EN" selected>Site Engineer</option>
+      <option value="SV">Supervisor / Foreman</option>
+      <option value="JE">Junior Engineer</option>
+      <option value="AS">Assistant Supervisor</option>
+      <option value="TK">Timekeeper</option>
+    </select>
+    <label>Department</label>
+    <input type="text" id="cu-dept" placeholder="e.g. Civil, Site Ops, Admin">
+    <label>Mobile</label>
+    <input type="tel" id="cu-mobile" placeholder="10-digit mobile" maxlength="10" inputmode="numeric">
+    <label>Username *</label>
+    <input type="text" id="cu-username" placeholder="e.g. firstname.lastname" autocapitalize="none">
+    <label>Password *</label>
+    <input type="password" id="cu-pass" placeholder="Set login password">
+    <div id="cu-error" class="form-error" style="margin-bottom:8px"></div>
+    <button class="btn btn-primary" onclick="doCreateUser()">Create Account</button>
   </div>
 </div>
 

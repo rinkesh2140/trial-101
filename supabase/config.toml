@@ -1,0 +1,21 @@
+# Supabase project configuration
+# Reference: https://supabase.com/docs/guides/cli/config
+
+[api]
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+shadow_port = 54320
+
+[studio]
+port = 54323
+
+[functions]
+# Edge functions are in supabase/functions/<name>/index.ts
+
+[auth]
+# Custom auth is implemented in-app (js/auth.js).
+# Supabase Auth is NOT used.
+enabled = false

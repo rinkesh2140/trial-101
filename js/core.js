@@ -32,7 +32,7 @@ const TAB_ACCESS = {
   work:      ['PM','SM','HR','SE','EN','SV','JE','AS'],
   messages:  ALL_ROLES,
   people:    ALL_ROLES,
-  admin:     ['SU'],
+  admin:     ['SU','PM','SM','HR'],
   more:      ALL_ROLES,
   schedule:  ALL_ROLES,
   mypad:     ALL_ROLES,

@@ -1,7 +1,11 @@
 // ui.js - Tab navigation and rendering logic
 // Dependencies: core.js, utils.js, db.js, auth.js
 
-tasks',      d); };
+const saveEmployees  = async d => { DB.employees   = d; await sbUpsert('employees',  d); };
+const saveUsers      = async d => { DB.users       = d; await sbUpsert('users',      d); };
+const saveSupAtt     = async d => { DB.attendance  = d; await sbUpsert('attendance', d); };
+const saveAvailList  = async d => { DB.availability= d; await sbUpsert('availability',d); };
+const saveTasks      = async d => { DB.tasks       = d; await sbUpsert('tasks',      d); };
 const saveNotes      = async d => { DB.notes       = d; await sbUpsert('notes',      d); };
 const saveLmsWorkers = async d => { DB.lmsWorkers  = d; await sbUpsert('lms_workers', d); };
 const saveLmsAtt     = async d => { DB.lmsAtt      = d; await sbUpsert('lms_attendance',d); };
