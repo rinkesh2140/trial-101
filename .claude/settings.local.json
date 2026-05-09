@@ -24,7 +24,17 @@
       "Bash(powershell -Command \"Select-String -Path ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' -Pattern ''waChatGroup|openDM|wa-conv'' | Select-Object -First 10\")",
       "Bash(powershell -Command \"Select-String -Path ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' -Pattern ''function openWAChat'' | Select-Object -First 5\")",
       "Bash(powershell -Command \":*)",
-      "Bash(powershell -Command \"Select-String -Path ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' -Pattern ''dash-content|wa-title|renderDash|wa-header'' | Select-Object -First 15\")"
+      "Bash(powershell -Command \"Select-String -Path ''f:\\\\RINKESH_CLAUDE\\\\supervisor.js'' -Pattern ''dash-content|wa-title|renderDash|wa-header'' | Select-Object -First 15\")",
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/categorize.sh)",
+      "Bash(/tmp/categorize.sh)",
+      "Bash(grep -E \"^[a-zA-Z_][a-zA-Z0-9_]*$\")",
+      "Bash(grep -E '^[a-zA-Z_][a-zA-Z0-9_]*$')",
+      "Bash(chmod +x /tmp/verify_globals.sh)",
+      "Bash(/tmp/verify_globals.sh)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

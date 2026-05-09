@@ -1,14 +1,27 @@
 {
-  "name": "patel-infrastructure-site-suite",
-  "version": "1.0.0",
-  "description": "Site Management Suite for Patel Infrastructure",
+  "name": "sitehub-pro",
+  "version": "2.0.0",
+  "description": "SiteHub Pro — Construction Site Management Platform",
+  "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 3000",
     "build": "vite build",
-    "preview": "vite preview",
-    "local": "npx serve ."
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.1",
+    "@supabase/supabase-js": "^2.45.4",
+    "@tanstack/react-query": "^5.56.2",
+    "lucide-react": "^0.441.0",
+    "date-fns": "^3.6.0"
   },
   "devDependencies": {
-    "vite": "^5.4.0"
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.11",
+    "vite": "^5.4.3"
   }
 }

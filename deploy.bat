@@ -1,14 +1,21 @@
 @echo off
 echo.
 echo  Copying latest files to deploy folder...
-copy /Y "f:\RINKESH_CLAUDE\supervisor.html" "f:\RINKESH_CLAUDE\deploy\supervisor.html"
-copy /Y "f:\RINKESH_CLAUDE\supervisor.css"  "f:\RINKESH_CLAUDE\deploy\supervisor.css"
-copy /Y "f:\RINKESH_CLAUDE\supervisor.js"   "f:\RINKESH_CLAUDE\deploy\supervisor.js"
-copy /Y "f:\RINKESH_CLAUDE\index.html" "f:\RINKESH_CLAUDE\deploy\labour.html"
+
+if not exist "d:\trial-101\deploy" mkdir "d:\trial-101\deploy"
+
+copy /Y "d:\trial-101\supervisor.html" "d:\trial-101\deploy\supervisor.html"
+copy /Y "d:\trial-101\supervisor.css"  "d:\trial-101\deploy\supervisor.css"
+copy /Y "d:\trial-101\supervisor.js"   "d:\trial-101\deploy\supervisor.js"
+copy /Y "d:\trial-101\index.html"      "d:\trial-101\deploy\index.html"
+copy /Y "d:\trial-101\worker.html"     "d:\trial-101\deploy\worker.html"
+copy /Y "d:\trial-101\open-app.html"   "d:\trial-101\deploy\open-app.html"
+copy /Y "d:\trial-101\manifest.json"   "d:\trial-101\deploy\manifest.json"
+
 echo  Done copying.
 echo.
 echo  Deploying to Firebase...
-cd /d f:\RINKESH_CLAUDE\deploy
+cd /d "d:\trial-101\deploy"
 firebase deploy --only hosting
 echo.
 echo  Deploy complete!
