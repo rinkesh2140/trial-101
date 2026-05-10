@@ -1,11 +1,10 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { Home, CheckSquare, BookOpen, Megaphone, User } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
+import { Outlet, NavLink } from 'react-router-dom'
+import { Home, CheckSquare, FileText, Megaphone, User } from 'lucide-react'
 
 const TABS = [
   { to: '/app',               icon: Home,        label: 'Home',    end: true },
   { to: '/app/tasks',         icon: CheckSquare, label: 'Tasks'           },
-  { to: '/app/notebook',      icon: BookOpen,    label: 'Notebook'        },
+  { to: '/app/reports',       icon: FileText,    label: 'Reports'         },
   { to: '/app/announcements', icon: Megaphone,   label: 'Updates'         },
   { to: '/app/profile',       icon: User,        label: 'Profile'         },
 ]

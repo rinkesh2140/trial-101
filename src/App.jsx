@@ -27,7 +27,7 @@ import AdminAnnounce   from './pages/admin/Announcements'
 import AppShell        from './pages/app/AppShell'
 import AppHome         from './pages/app/Home'
 import AppTasks        from './pages/app/MyTasks'
-import AppNotebook     from './pages/app/Notebook'
+import AppReports      from './pages/app/Reports'
 import AppAnnounce     from './pages/app/Announcements'
 import AppProfile      from './pages/app/Profile'
 
@@ -95,7 +95,7 @@ export default function App() {
         <Route path="/app" element={<Guard><AppShell /></Guard>}>
           <Route index element={<AppHome />} />
           <Route path="tasks"         element={<AppTasks />} />
-          <Route path="notebook"      element={<AppNotebook />} />
+          <Route path="reports"       element={<AppReports />} />
           <Route path="announcements" element={<AppAnnounce />} />
           <Route path="profile"       element={<AppProfile />} />
         </Route>
