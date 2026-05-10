@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Building2, Plus, Search, Users, MapPin, MoreVertical, Trash2, Edit2 } from 'lucide-react'
+import { Building2, Plus, Search, Users, MapPin, Trash2, Settings } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Spinner from '../../components/ui/Spinner'
 import Modal from '../../components/ui/Modal'
@@ -23,6 +24,7 @@ function useCompanies() {
 export default function SACompanies() {
   const { data: companies = [], isLoading } = useCompanies()
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [search, setSearch]       = useState('')
   const [showAdd, setShowAdd]     = useState(false)
   const [saving, setSaving]       = useState(false)
@@ -47,11 +49,10 @@ export default function SACompanies() {
       if (cErr) throw cErr
 
       const { error: uErr } = await supabase.from('users').insert({
-        username:     form.admin_username.trim(),
-        password:     form.admin_password,
-        role:         'company_admin',
-        email:        form.admin_email.trim() || null,
-        company_id:   company.id,
+        username:      form.admin_username.trim(),
+        password:      form.admin_password,
+        role:          'company_admin',
+        company_id:    company.id,
         is_superadmin: false,
       })
       if (uErr) throw uErr
@@ -120,9 +121,14 @@ export default function SACompanies() {
                   </span>
                 </div>
               </div>
-              <button onClick={() => handleDelete(c)} className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors">
-                <Trash2 size={16} />
-              </button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={() => navigate(`/superadmin/company/${c.id}`)} className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors">
+                  <Settings size={16} />
+                </button>
+                <button onClick={() => handleDelete(c)} className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           ))}
         </div>

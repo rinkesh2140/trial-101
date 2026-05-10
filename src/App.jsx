@@ -4,11 +4,15 @@ import Spinner from './components/ui/Spinner'
 
 import Login from './pages/Login'
 
-import SuperadminShell from './pages/superadmin/SuperadminShell'
-import SADashboard     from './pages/superadmin/Dashboard'
-import SACompanies     from './pages/superadmin/Companies'
-import SAUsers         from './pages/superadmin/Users'
-import SAAnalytics     from './pages/superadmin/Analytics'
+import SuperadminShell    from './pages/superadmin/SuperadminShell'
+import SADashboard        from './pages/superadmin/Dashboard'
+import SACompanies        from './pages/superadmin/Companies'
+import SAUsers            from './pages/superadmin/Users'
+import SAAnalytics        from './pages/superadmin/Analytics'
+import SAAttendance       from './pages/superadmin/SAAttendance'
+import SATasks            from './pages/superadmin/SATasks'
+import SAAnnouncements    from './pages/superadmin/SAAnnouncements'
+import CompanyDetail      from './pages/superadmin/CompanyDetail'
 
 import AdminShell      from './pages/admin/AdminShell'
 import AdminDashboard  from './pages/admin/Dashboard'
@@ -65,10 +69,14 @@ export default function App() {
 
         {/* Superadmin */}
         <Route path="/superadmin" element={<Guard require="superadmin"><SuperadminShell /></Guard>}>
-          <Route index element={<SADashboard />} />
-          <Route path="companies" element={<SACompanies />} />
-          <Route path="users"     element={<SAUsers />} />
-          <Route path="analytics" element={<SAAnalytics />} />
+          <Route index                      element={<SADashboard />} />
+          <Route path="companies"           element={<SACompanies />} />
+          <Route path="company/:id"         element={<CompanyDetail />} />
+          <Route path="attendance"          element={<SAAttendance />} />
+          <Route path="tasks"               element={<SATasks />} />
+          <Route path="announcements"       element={<SAAnnouncements />} />
+          <Route path="analytics"           element={<SAAnalytics />} />
+          <Route path="users"               element={<SAUsers />} />
         </Route>
 
         {/* Company Admin */}
