@@ -68,3 +68,9 @@ DO $$ BEGIN
     CREATE POLICY "allow_all" ON notifications FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
   END IF;
 END $$;
+
+-- 8. Roles: description column
+ALTER TABLE roles ADD COLUMN IF NOT EXISTS description TEXT;
+
+-- 9. Force PostgREST schema cache reload (fixes "column not found in schema cache" errors)
+NOTIFY pgrst, 'reload schema';
