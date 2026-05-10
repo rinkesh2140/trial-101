@@ -9,11 +9,31 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY)
-      if (raw) setSession(JSON.parse(raw))
-    } catch {}
-    setLoading(false)
+    async function loadSession() {
+      try {
+        const raw = localStorage.getItem(SESSION_KEY)
+        if (raw) {
+          const stored = JSON.parse(raw)
+          // Re-verify role from DB on every load — only use columns guaranteed to exist
+          if (stored?.user?.username) {
+            const { data: fresh } = await supabase
+              .from('users')
+              .select('role, company_id, is_superadmin')
+              .eq('username', stored.user.username)
+              .maybeSingle()
+            if (fresh) {
+              stored.user.role = fresh.role
+              stored.user.company_id = fresh.company_id
+              stored.user.is_superadmin = fresh.is_superadmin ?? (fresh.role === 'superadmin')
+              try { localStorage.setItem(SESSION_KEY, JSON.stringify(stored)) } catch {}
+            }
+          }
+          setSession(stored)
+        }
+      } catch {}
+      setLoading(false)
+    }
+    loadSession()
   }, [])
 
   async function login(username, password) {
@@ -107,7 +127,7 @@ export function AuthProvider({ children }) {
       logout,
       refreshSession,
       can,
-      isSuperAdmin:   session?.user?.is_superadmin === true,
+      isSuperAdmin:   session?.user?.role === 'superadmin' || session?.user?.is_superadmin === true,
       isCompanyAdmin: session?.user?.role === 'company_admin',
     }}>
       {children}

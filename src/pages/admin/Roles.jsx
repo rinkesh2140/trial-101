@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ShieldCheck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
+import { ShieldCheck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Layers } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { ROLE_TEMPLATES } from '../../lib/roleTemplates'
 import Spinner from '../../components/ui/Spinner'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
@@ -26,10 +27,12 @@ export default function AdminRoles() {
   const { user } = useAuth()
   const cid = user?.company_id
   const qc  = useQueryClient()
-  const [modal, setModal]   = useState(null)
-  const [form, setForm]     = useState(BLANK)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr]       = useState('')
+  const [modal, setModal]       = useState(null)
+  const [form, setForm]         = useState(BLANK)
+  const [saving, setSaving]     = useState(false)
+  const [err, setErr]           = useState('')
+  const [loadingTpl, setLoadingTpl] = useState(false)
+  const [tplConfirm, setTplConfirm] = useState(false)
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['roles', cid],
@@ -81,6 +84,21 @@ export default function AdminRoles() {
     qc.invalidateQueries({ queryKey: ['roles', cid] })
   }
 
+  async function loadTemplates() {
+    setLoadingTpl(true)
+    const existing = roles.map(r => r.name.toLowerCase())
+    const toInsert = ROLE_TEMPLATES
+      .filter(t => !existing.includes(t.name.toLowerCase()))
+      .map(({ name, level, color, description, permissions }) => ({ name, level, color, description, permissions, company_id: cid }))
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('roles').insert(toInsert)
+      if (error) alert('Error loading templates: ' + error.message)
+      else await qc.invalidateQueries({ queryKey: ['roles', cid] })
+    }
+    setLoadingTpl(false)
+    setTplConfirm(false)
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -91,14 +109,31 @@ export default function AdminRoles() {
         <Button onClick={openAdd}><Plus size={18} /> Add Role</Button>
       </div>
 
+      {roles.length === 0 && !isLoading && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3">
+          <Layers size={20} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm">Load Standard Construction Roles</p>
+            <p className="text-slate-400 text-xs mt-0.5">14 pre-configured roles from Project Manager to Labour — ready to use or customise.</p>
+          </div>
+          <Button onClick={() => setTplConfirm(true)} loading={loadingTpl}>
+            Load Templates
+          </Button>
+        </div>
+      )}
+
+      {roles.length > 0 && (
+        <button
+          onClick={() => setTplConfirm(true)}
+          className="flex items-center gap-2 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+        >
+          <Layers size={15} /> Load Standard Templates
+        </button>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-12"><Spinner size={32} /></div>
-      ) : roles.length === 0 ? (
-        <div className="text-center py-16 text-slate-500">
-          <ShieldCheck size={40} className="mx-auto mb-3 opacity-30" />
-          <p>No roles yet. Create roles to control feature access.</p>
-        </div>
-      ) : (
+      ) : roles.length === 0 ? null : (
         <div className="space-y-3">
           {roles.map(r => (
             <div key={r.id} className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
@@ -132,6 +167,21 @@ export default function AdminRoles() {
           ))}
         </div>
       )}
+
+      <Modal
+        open={tplConfirm}
+        onClose={() => setTplConfirm(false)}
+        title="Load Standard Templates"
+        footer={
+          <>
+            <Button variant="secondary" fullWidth onClick={() => setTplConfirm(false)}>Cancel</Button>
+            <Button fullWidth onClick={loadTemplates} loading={loadingTpl}>Load Templates</Button>
+          </>
+        }
+      >
+        <p className="text-slate-400 text-sm">This will add <span className="text-white font-semibold">14 standard construction roles</span> (Project Manager → Labour) to your company. Roles that already exist by name will be skipped.</p>
+        <p className="text-slate-500 text-xs mt-2">You can edit or delete any loaded role afterwards.</p>
+      </Modal>
 
       <Modal
         open={!!modal}

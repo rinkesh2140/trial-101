@@ -52,10 +52,14 @@ function useAnnouncements(cid) {
 }
 
 export default function AppHome() {
-  const { employee, user, assignedSites } = useAuth()
+  const { employee, user, assignedSites, isSuperAdmin, isCompanyAdmin } = useAuth()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const t = today()
+
+  // Redirect superadmin/admin who somehow land on /app
+  if (isSuperAdmin) { navigate('/superadmin', { replace: true }); return null }
+  if (isCompanyAdmin) { navigate('/admin', { replace: true }); return null }
 
   const { data: att, isLoading: attLoading } = useAttendance(employee?.id, t)
   const { data: tasks = [] } = useTodayTasks(employee?.id, user?.company_id)

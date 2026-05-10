@@ -21,7 +21,6 @@ function useOverview() {
         { count: openTasks },
         { count: pendingRequests },
         { data: recentCompanies },
-        { data: flaggedAtt },
       ] = await Promise.all([
         supabase.from('companies').select('*', { count: 'exact', head: true }),
         supabase.from('employees').select('*', { count: 'exact', head: true }).eq('active', true),
@@ -30,10 +29,15 @@ function useOverview() {
         supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['open', 'in_progress']),
         supabase.from('punch_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('companies').select('id,name,created_at').order('created_at', { ascending: false }).limit(5),
-        supabase.from('attendance').select('id,employeeId,date,check_in_outside_geofence')
-          .eq('date', t).eq('check_in_outside_geofence', true).limit(5),
       ])
-      return { companies, employees, sites, presentToday, openTasks, pendingRequests, recentCompanies: recentCompanies ?? [], flaggedAtt: flaggedAtt ?? [] }
+      // Safe query — check_in_outside_geofence column may not exist yet
+      let flaggedAtt = []
+      const { data: flagged, error: flagErr } = await supabase
+        .from('attendance').select('id,date')
+        .eq('date', t).eq('check_in_outside_geofence', true).limit(5)
+      if (!flagErr) flaggedAtt = flagged ?? []
+
+      return { companies, employees, sites, presentToday, openTasks, pendingRequests, recentCompanies: recentCompanies ?? [], flaggedAtt }
     }
   })
 }
@@ -105,8 +109,8 @@ export default function SADashboard() {
               </div>
               {stats.flaggedAtt.map(a => (
                 <div key={a.id} className="px-5 py-3 border-b border-orange-500/10 last:border-0 flex items-center justify-between">
-                  <span className="text-slate-300 text-sm">{a.employeeId}</span>
-                  <Badge variant="orange">flagged</Badge>
+                  <span className="text-slate-300 text-sm">{a.id?.split('_')?.[0] ?? a.id}</span>
+                  <Badge variant="orange">outside geofence</Badge>
                 </div>
               ))}
             </div>
