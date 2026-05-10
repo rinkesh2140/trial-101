@@ -1,77 +1,78 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Building2, BarChart3, LogOut, HardHat, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+import {
+  LayoutDashboard, Building2, Users, BarChart3,
+  LogOut, HardHat, Menu, X, ShieldCheck
+} from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
 const NAV = [
-  { to: '/superadmin',           icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/superadmin/companies', icon: Building2,       label: 'Companies' },
-  { to: '/superadmin/analytics', icon: BarChart3,       label: 'Analytics' },
+  { to: '/superadmin',            icon: LayoutDashboard, label: 'Overview',  end: true },
+  { to: '/superadmin/companies',  icon: Building2,       label: 'Companies'           },
+  { to: '/superadmin/users',      icon: Users,           label: 'Users'               },
+  { to: '/superadmin/analytics',  icon: BarChart3,       label: 'Analytics'           },
 ]
 
 export default function SuperadminShell() {
   const { logout } = useAuth()
   const navigate   = useNavigate()
+  const [open, setOpen] = useState(false)
 
-  function handleLogout() {
-    logout()
-    navigate('/login')
-  }
+  function handleLogout() { logout(); navigate('/login', { replace: true }) }
 
   return (
     <div className="min-h-screen bg-slate-900 flex">
+      {/* Sidebar backdrop */}
+      {open && <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setOpen(false)} />}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col fixed h-full hidden md:flex">
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-700">
-          <div className="w-9 h-9 bg-amber-500 rounded-xl flex items-center justify-center">
-            <HardHat size={20} className="text-slate-900" />
+      <aside className={`fixed top-0 left-0 h-full w-64 bg-slate-800 border-r border-slate-700 flex flex-col z-50 transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        <div className="flex items-center justify-between px-5 py-5 border-b border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-amber-500 rounded-xl flex items-center justify-center">
+              <HardHat size={18} className="text-slate-900" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm leading-none">SiteHub Pro</p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <ShieldCheck size={10} className="text-amber-400" />
+                <p className="text-amber-400 text-xs font-semibold">SUPER ADMIN</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-none">SiteHub Pro</p>
-            <p className="text-amber-400 text-xs mt-0.5 font-medium">Super Admin</p>
-          </div>
+          <button onClick={() => setOpen(false)} className="md:hidden text-slate-400"><X size={18} /></button>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-0.5">
           {NAV.map(({ to, icon: Icon, label, end }) => (
-            <NavLink
-              key={to} to={to} end={end}
-              className={({ isActive }) => `
-                flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors
-                ${isActive
-                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700'}
-              `}
+            <NavLink key={to} to={to} end={end} onClick={() => setOpen(false)}
+              className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors
+                ${isActive ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
             >
-              <Icon size={18} />
-              {label}
+              <Icon size={17} />{label}
             </NavLink>
           ))}
         </nav>
 
-        {/* Logout */}
         <div className="p-3 border-t border-slate-700">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-          >
-            <LogOut size={18} />
-            Sign Out
+          <button onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+            <LogOut size={17} />Sign Out
           </button>
         </div>
       </aside>
 
-      {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-800 border-b border-slate-700 h-14 flex items-center px-4 gap-3">
-        <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-          <HardHat size={16} className="text-slate-900" />
+      {/* Mobile topbar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-slate-800 border-b border-slate-700 h-14 flex items-center px-4 gap-3">
+        <button onClick={() => setOpen(true)} className="text-slate-400"><Menu size={22} /></button>
+        <div className="w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center">
+          <HardHat size={14} className="text-slate-900" />
         </div>
-        <p className="text-white font-bold flex-1">SiteHub Pro</p>
-        <span className="text-xs bg-amber-500/15 text-amber-400 border border-amber-500/20 px-2 py-1 rounded-lg font-semibold">SUPERADMIN</span>
+        <p className="text-white font-bold flex-1 text-sm">SiteHub Pro</p>
+        <span className="text-xs bg-amber-500/15 text-amber-400 border border-amber-500/20 px-2 py-1 rounded-lg font-bold">SA</span>
       </div>
 
-      {/* Main content */}
+      {/* Main */}
       <main className="flex-1 md:ml-64 pt-14 md:pt-0 overflow-y-auto">
         <div className="max-w-6xl mx-auto p-4 md:p-6">
           <Outlet />
@@ -79,27 +80,18 @@ export default function SuperadminShell() {
       </main>
 
       {/* Mobile bottom nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-800 border-t border-slate-700 flex safe-bottom">
-        {NAV.map(({ to, icon: Icon, label, end }) => (
-          <NavLink
-            key={to} to={to} end={end}
-            className={({ isActive }) => `
-              flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors
-              ${isActive ? 'text-amber-400' : 'text-slate-500'}
-            `}
-          >
-            <Icon size={20} />
-            {label}
-          </NavLink>
-        ))}
-        <button
-          onClick={handleLogout}
-          className="flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium text-slate-500"
-        >
-          <LogOut size={20} />
-          Sign Out
-        </button>
-      </div>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-800 border-t border-slate-700">
+        <div className="flex">
+          {NAV.map(({ to, icon: Icon, label, end }) => (
+            <NavLink key={to} to={to} end={end}
+              className={({ isActive }) => `flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-[10px] font-medium transition-colors min-h-[56px]
+                ${isActive ? 'text-amber-400' : 'text-slate-500'}`}
+            >
+              <Icon size={20} strokeWidth={1.75} />{label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
     </div>
   )
 }

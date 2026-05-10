@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import SuperadminShell from './pages/superadmin/SuperadminShell'
 import SADashboard     from './pages/superadmin/Dashboard'
 import SACompanies     from './pages/superadmin/Companies'
+import SAUsers         from './pages/superadmin/Users'
 import SAAnalytics     from './pages/superadmin/Analytics'
 
 import AdminShell      from './pages/admin/AdminShell'
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="/superadmin" element={<Guard require="superadmin"><SuperadminShell /></Guard>}>
           <Route index element={<SADashboard />} />
           <Route path="companies" element={<SACompanies />} />
+          <Route path="users"     element={<SAUsers />} />
           <Route path="analytics" element={<SAAnalytics />} />
         </Route>
 
