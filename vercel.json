@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/supervisor", "destination": "/supervisor.html" },
+    { "source": "/lms",        "destination": "/index.html"      },
+    { "source": "/(.*)",       "destination": "/sitehub.html"    }
+  ]
+}
